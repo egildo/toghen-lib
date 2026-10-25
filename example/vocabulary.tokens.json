@@ -1,0 +1,21 @@
+{
+  "$extensions": {
+    "com.toghen": {
+      "css": {
+        "parts": {
+          "variant": {
+            "primary": "[data-variant='primary']"
+          },
+          "state": {
+            "hover": ":hover",
+            "pressed": ":active",
+            "disabled": ":is(:disabled, [aria-disabled='true'])"
+          },
+          "selection": {
+            "selected": "[aria-pressed='true']"
+          }
+        }
+      }
+    }
+  }
+}

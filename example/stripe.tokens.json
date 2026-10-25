@@ -1,0 +1,17 @@
+{
+  "surface": {
+    "$type": "color",
+    "stripe": {
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.9608,
+          0.9608,
+          0.9608
+        ],
+        "hex": "#f5f5f5"
+      },
+      "$description": "Every second row of a table."
+    }
+  }
+}

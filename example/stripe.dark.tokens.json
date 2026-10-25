@@ -1,0 +1,16 @@
+{
+  "surface": {
+    "$type": "color",
+    "stripe": {
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.1412,
+          0.1412,
+          0.1412
+        ],
+        "hex": "#242424"
+      }
+    }
+  }
+}

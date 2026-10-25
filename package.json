@@ -1,0 +1,66 @@
+{
+  "name": "@toghen/lib",
+  "version": "0.1.0",
+  "description": "A lean, elegant design token utilities library with W3C compliance, immutable tokens, and multi-mode support",
+  "main": "dist/index.js",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./example/*": "./example/*"
+  },
+  "scripts": {
+    "test": "node --import tsx/esm --test 'test/**/*.test.ts'",
+    "build": "tsup src/index.ts --format esm --dts --clean --external culori",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.test.json",
+    "dev": "tsx --watch test/integration/design-system.test.ts",
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch",
+    "docs:serve": "typedoc --serve",
+    "prepare": "pnpm run build",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "check": "biome check . && pnpm typecheck && pnpm test && pnpm build && node scripts/check-purity.mjs"
+  },
+  "keywords": [
+    "design-tokens",
+    "design-system",
+    "tokens",
+    "w3c",
+    "immutable",
+    "css",
+    "design"
+  ],
+  "author": "Egildo Tagliareni <egildo@tagliareni.it>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://codeberg.org/Toghen/lib.git"
+  },
+  "bugs": {
+    "url": "https://codeberg.org/Toghen/lib/issues"
+  },
+  "homepage": "https://codeberg.org/Toghen/lib#readme",
+  "files": [
+    "src/",
+    "dist/",
+    "example/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/culori": "^4.0.0",
+    "@types/node": "^24.1.0",
+    "tsup": "^8.4.0",
+    "tsx": "^4.20.3",
+    "typedoc": "^0.28.13",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "culori": "^4.0.2"
+  },
+  "packageManager": "pnpm@10.29.3"
+}

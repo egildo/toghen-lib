@@ -1,0 +1,15 @@
+{
+  "parts": [
+    {
+      "at": "button.primary",
+      "key": "primary",
+      "axis": "variant",
+      "spelling": "[data-variant='primary']",
+      "twin": "button.backgroundColor",
+      "twinExists": true
+    }
+  ],
+  "rest": "button.backgroundColor",
+  "restExists": true,
+  "component": "button"
+}

@@ -1,0 +1,49 @@
+// Copied from house 0.1.0. Change it in house, then copy it out again.
+// Two-space indent and single quotes are what most of Toghen's files already used;
+// JSON and CSS are left alone: token documents, fixtures and the toghen() stylesheets
+// are written by hand, and some are compared as text.
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  // CSS is not even parsed: the toghen() directives are not CSS until @toghen/postcss resolves them.
+  "files": { "ignoreUnknown": true, "includes": ["**", "!**/*.css"] },
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 140 },
+  "javascript": { "formatter": { "quoteStyle": "single", "semicolons": "always" } },
+  "json": { "formatter": { "enabled": false }, "linter": { "enabled": false } },
+  // Two recommended rules are off, by count rather than by taste: noNonNullAssertion
+  // (about 1,100 places) and noExplicitAny (about 300, most in tests and in the
+  // Figma mocks). Each `!` and `any` was written on purpose under strict TypeScript;
+  // rewriting them all would change code without changing behaviour, which a
+  // tooling round does not do. Turn either back on when a round means to remove them.
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": { "noNonNullAssertion": "off" },
+      "suspicious": { "noExplicitAny": "off" }
+    }
+  },
+  "assist": { "enabled": true, "actions": { "source": { "organizeImports": "off" } } },
+  "overrides": [
+    // noPrototypeBuiltins: the tsconfig target is es2017, whose lib has no Object.hasOwn; hasOwnProperty is called deliberately on plain data.
+    {
+      "includes": ["src/core/design-system.ts", "src/core/design-token.ts", "src/resolver/chains.ts", "src/resolver/load.ts", "src/resolver/resolver.ts", "src/utils/css-color.ts"],
+      "linter": { "rules": { "suspicious": { "noPrototypeBuiltins": "off" } } }
+    },
+    // noCommaOperator: `(i++, sum())` advances the parser's cursor and parses in one expression, on purpose.
+    {
+      "includes": ["src/utils/css-math.ts"],
+      "linter": { "rules": { "complexity": { "noCommaOperator": "off" } } }
+    },
+    // noShadowRestrictedNames: the script's local `escape` (regex escaper) shadows the legacy global on purpose; it is a standalone script.
+    {
+      "includes": ["scripts/check-purity.mjs"],
+      "linter": { "rules": { "suspicious": { "noShadowRestrictedNames": "off" } } }
+    },
+    // noAssignInExpressions: regex-scanner loop condition, memoised cache fill and cached-index return are written as assignments on purpose.
+    {
+      "includes": ["src/core/alias.ts", "src/resolver/chains.ts", "src/resolver/resolver.ts"],
+      "linter": { "rules": { "suspicious": { "noAssignInExpressions": "off" } } }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "version": "2025-11-01",
+  "name": "ds",
+  "description": "The running example with a warm accent: the base's layers, and one set of its own.",
+  "sets": {
+    "warm": {
+      "sources": [
+        {
+          "$ref": "warm.tokens.json"
+        }
+      ]
+    }
+  },
+  "resolutionOrder": [
+    {
+      "$ref": "ds.resolver.json#/sets/base"
+    },
+    {
+      "$ref": "#/sets/warm"
+    },
+    {
+      "$ref": "ds.resolver.json#/modifiers/theme"
+    },
+    {
+      "$ref": "ds.resolver.json#/modifiers/density"
+    }
+  ]
+}

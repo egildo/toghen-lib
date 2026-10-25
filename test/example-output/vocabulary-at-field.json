@@ -1,0 +1,13 @@
+{
+  "variant": {
+    "primary": "[data-variant='primary']"
+  },
+  "state": {
+    "hover": ":hover",
+    "pressed": ":active",
+    "disabled": ":has(> input:disabled)"
+  },
+  "selection": {
+    "selected": "[aria-pressed='true']"
+  }
+}

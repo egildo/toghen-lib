@@ -1,0 +1,43 @@
+{
+  "field": {
+    "$extensions": {
+      "com.toghen": {
+        "css": {
+          "parts": {
+            "state": {
+              "disabled": ":has(> input:disabled)"
+            }
+          }
+        }
+      }
+    },
+    "backgroundColor": {
+      "$type": "color",
+      "$value": "{surface.raised}"
+    },
+    "color": {
+      "$type": "color",
+      "$value": "{text.default}"
+    },
+    "paddingBlock": {
+      "$type": "dimension",
+      "$value": "{space.sm}"
+    },
+    "borderRadius": {
+      "$type": "dimension",
+      "$value": "{radius.md}"
+    },
+    "focus": {
+      "outlineColor": {
+        "$type": "color",
+        "$value": "{surface.accent}"
+      }
+    },
+    "disabled": {
+      "opacity": {
+        "$type": "number",
+        "$value": 0.5
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "parts": [
+    {
+      "at": "button.selected",
+      "key": "selected",
+      "axis": "selection",
+      "spelling": "[aria-pressed='true']",
+      "twin": "button.hover.backgroundColor",
+      "twinExists": true
+    },
+    {
+      "at": "button.selected.hover",
+      "key": "hover",
+      "axis": "state",
+      "spelling": ":hover",
+      "twin": "button.selected.backgroundColor",
+      "twinExists": true
+    }
+  ],
+  "rest": "button.backgroundColor",
+  "restExists": true,
+  "component": "button"
+}

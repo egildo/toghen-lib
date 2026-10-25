@@ -1,0 +1,23 @@
+{
+  "entryPoints": ["src/index.ts"],
+  "out": ".typedoc",
+  "theme": "default",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeExternals": true,
+  "readme": "README.md",
+  "projectDocuments": ["guide.md", "reference.md", "specs.md"],
+  "name": "Toghen-Lib API Documentation",
+  "tsconfig": "tsconfig.json",
+  "plugin": [],
+  "sort": ["source-order"],
+  "categorizeByGroup": false,
+  "defaultCategory": "Other",
+  "categoryOrder": [
+    "Core",
+    "Handlers",
+    "Types",
+    "*"
+  ]
+}

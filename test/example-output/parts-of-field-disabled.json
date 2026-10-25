@@ -1,0 +1,15 @@
+{
+  "parts": [
+    {
+      "at": "field.disabled",
+      "key": "disabled",
+      "axis": "state",
+      "spelling": ":has(> input:disabled)",
+      "twin": "field.opacity",
+      "twinExists": false
+    }
+  ],
+  "rest": "field.opacity",
+  "restExists": false,
+  "component": "field"
+}

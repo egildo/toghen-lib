@@ -1,0 +1,81 @@
+{
+  "version": "2025-11-01",
+  "name": "ds",
+  "description": "The running example with a row stripe that changes with the theme and with the density.",
+  "sets": {
+    "base": {
+      "sources": [
+        {
+          "$ref": "vocabulary.tokens.json"
+        },
+        {
+          "$ref": "roles.tokens.json"
+        },
+        {
+          "$ref": "button.tokens.json"
+        },
+        {
+          "$ref": "field.tokens.json"
+        },
+        {
+          "$ref": "stripe.tokens.json"
+        }
+      ]
+    }
+  },
+  "modifiers": {
+    "theme": {
+      "default": "light",
+      "contexts": {
+        "light": [],
+        "dark": [
+          {
+            "$ref": "theme.dark.tokens.json"
+          },
+          {
+            "$ref": "stripe.dark.tokens.json"
+          }
+        ]
+      },
+      "$extensions": {
+        "com.toghen": {
+          "css": {
+            "selector": "[data-theme='{context}']"
+          }
+        }
+      }
+    },
+    "density": {
+      "default": "regular",
+      "contexts": {
+        "regular": [],
+        "compact": [
+          {
+            "$ref": "density.compact.tokens.json"
+          },
+          {
+            "$ref": "stripe.compact.tokens.json"
+          }
+        ]
+      },
+      "$extensions": {
+        "com.toghen": {
+          "css": {
+            "selector": "[data-density='{context}']"
+          }
+        }
+      }
+    }
+  },
+  "resolutionOrder": [
+    {
+      "$ref": "#/sets/base"
+    },
+    {
+      "$ref": "#/modifiers/theme"
+    },
+    {
+      "$ref": "#/modifiers/density"
+    }
+  ]
+}

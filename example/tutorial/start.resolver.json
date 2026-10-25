@@ -1,0 +1,69 @@
+{
+  "version": "2025-11-01",
+  "name": "ds",
+  "description": "The running example as the tutorial builds it: a button with no parts, and a vocabulary with no axes.",
+  "sets": {
+    "base": {
+      "sources": [
+        {
+          "$ref": "../roles.tokens.json"
+        },
+        {
+          "$ref": "vocabulary.start.tokens.json"
+        },
+        {
+          "$ref": "button.start.tokens.json"
+        }
+      ]
+    }
+  },
+  "modifiers": {
+    "theme": {
+      "default": "light",
+      "contexts": {
+        "light": [],
+        "dark": [
+          {
+            "$ref": "../theme.dark.tokens.json"
+          }
+        ]
+      },
+      "$extensions": {
+        "com.toghen": {
+          "css": {
+            "selector": "[data-theme='{context}']"
+          }
+        }
+      }
+    },
+    "density": {
+      "default": "regular",
+      "contexts": {
+        "regular": [],
+        "compact": [
+          {
+            "$ref": "../density.compact.tokens.json"
+          }
+        ]
+      },
+      "$extensions": {
+        "com.toghen": {
+          "css": {
+            "selector": "[data-density='{context}']"
+          }
+        }
+      }
+    }
+  },
+  "resolutionOrder": [
+    {
+      "$ref": "#/sets/base"
+    },
+    {
+      "$ref": "#/modifiers/theme"
+    },
+    {
+      "$ref": "#/modifiers/density"
+    }
+  ]
+}

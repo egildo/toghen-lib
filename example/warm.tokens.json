@@ -1,0 +1,16 @@
+{
+  "surface": {
+    "$type": "color",
+    "accent": {
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.902,
+          0.4,
+          0.102
+        ],
+        "hex": "#e6661a"
+      }
+    }
+  }
+}

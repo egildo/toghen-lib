@@ -1,0 +1,74 @@
+{
+  "button": {
+    "backgroundColor": {
+      "$type": "color",
+      "$value": "{surface.raised}"
+    },
+    "color": {
+      "$type": "color",
+      "$value": "{text.default}"
+    },
+    "paddingBlock": {
+      "$type": "dimension",
+      "$value": "{space.sm}"
+    },
+    "borderRadius": {
+      "$type": "dimension",
+      "$value": "{radius.md}"
+    },
+    "font": {
+      "$type": "typography",
+      "$value": "{type.label}"
+    },
+    "icon": {
+      "color": {
+        "$type": "color",
+        "$value": "{text.muted}"
+      }
+    },
+    "primary": {
+      "backgroundColor": {
+        "$type": "color",
+        "$value": "{surface.accent}"
+      },
+      "color": {
+        "$type": "color",
+        "$value": "{text.on-accent}"
+      }
+    },
+    "hover": {
+      "backgroundColor": {
+        "$type": "color",
+        "$value": "{surface.selected}"
+      }
+    },
+    "pressed": {
+      "backgroundColor": {
+        "$type": "color",
+        "$value": "{surface.selected}"
+      },
+      "color": {
+        "$type": "color",
+        "$value": "{text.muted}"
+      }
+    },
+    "disabled": {
+      "color": {
+        "$type": "color",
+        "$value": "{text.muted}"
+      }
+    },
+    "selected": {
+      "backgroundColor": {
+        "$type": "color",
+        "$value": "{surface.selected}"
+      },
+      "hover": {
+        "backgroundColor": {
+          "$type": "color",
+          "$value": "{surface.accent}"
+        }
+      }
+    }
+  }
+}

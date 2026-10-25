@@ -1,0 +1,36 @@
+{
+  "button": {
+    "backgroundColor": {
+      "$type": "color",
+      "$value": "{surface.raised}"
+    },
+    "color": {
+      "$type": "color",
+      "$value": "{text.default}"
+    },
+    "paddingBlock": {
+      "$type": "dimension",
+      "$value": "{space.sm}"
+    },
+    "borderRadius": {
+      "$type": "dimension",
+      "$value": "{radius.md}"
+    },
+    "font": {
+      "$type": "typography",
+      "$value": "{type.label}"
+    },
+    "icon": {
+      "color": {
+        "$type": "color",
+        "$value": "{text.muted}"
+      }
+    },
+    "hover": {
+      "backgroundColor": {
+        "$type": "color",
+        "$value": "{surface.selected}"
+      }
+    }
+  }
+}
