@@ -61,8 +61,8 @@ export { normalizeGradient } from './utils/normalize-gradient.js';
 
 // The names two adapters share
 export { cssPropertyName, cssIdentifier, cssLinkName } from './utils/css-name.js';
-export { getContextSelector } from './resolver/context-selector.js';
-export type { ContextSelector } from './resolver/context-selector.js';
+export { getContextSelector, getLightDark } from './resolver/context-selector.js';
+export type { ContextSelector, LightDark } from './resolver/context-selector.js';
 
 // W3C Resolver Module
 export { Resolver } from './resolver/resolver.js';

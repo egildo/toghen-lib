@@ -706,6 +706,16 @@ brace is text" (issue #129). Data files are JSON and component files KDL; both a
 
 **With it.** Biome lints and formats the code, `pnpm check` runs every gate, and speckit with the house preset runs the rounds. The running example now ships with the package (`example/` in `files`, `./example/*` in `exports`), so the other packages read it through `@toghen/lib` rather than by a folder path. The tests are type-checked, under `tsconfig.test.json`.
 
+## Ruled: a two-context colour modifier spelled with `light-dark()` (30 October 2026)
+
+**Status:** done, in 0.1.1.
+
+**The need.** A theme modifier spelled as a media query lets only the operating system choose the scheme; an app cannot offer its own switch. CSS's `light-dark(a, b)` follows the used `color-scheme`, which an app sets on any element. An adapter needs to know that a modifier is such a pair, and which context is which.
+
+**The shape.** A modifier's CSS member may carry `lightDark: { light, dark }` instead of a selector or an at-rule, and `getLightDark()` reads it, from a resolver document's modifier or from a collection's recorded one. It refuses what cannot be a pair: a non-object, a missing or non-string name, the same name twice, a name that is no context, a modifier without exactly two contexts, and a second spelling beside it. `getContextSelector()` is unchanged and returns `undefined` for such a modifier, since it has no `selector` or `atRule`.
+
+**Rejected.** A per-context `colorScheme` under `contexts`: longer to write, and it does not say that the two contexts are a pair.
+
 ## Open questions
 
 ### From computing values (24 October 2026)

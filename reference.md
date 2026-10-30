@@ -52,6 +52,7 @@ import {
   cssIdentifier,
   cssLinkName,
   getContextSelector,
+  getLightDark,
 } from '@toghen/lib';
 
 import type {
@@ -69,7 +70,7 @@ import type {
   // Per-modifier queries
   LeafProperty, Step, Chain, ChainLink, NonFactorable, TokenContexts,
   // CSS spelling of a context, and loading
-  ContextSelector, LoadOptions, LoadResult,
+  ContextSelector, LightDark, LoadOptions, LoadResult,
 } from '@toghen/lib';
 ```
 
@@ -1160,7 +1161,36 @@ Returns `{ selector?, atRule? }`, or `undefined` when the modifier
 gives no spelling for that context.
 Throws `ResolverValidationError` when `selector` or `atRule` is not a string, or an `atRule` does not start
 with `@`: the fault is in the modifier's `$extensions`. `modifier` is a resolver document's
-modifier or one from `collection.getModifiers()`.
+modifier or one from `collection.getModifiers()`. A modifier with `lightDark` has no selector spelling:
+it returns `undefined` for every context (see [`getLightDark`](#getlightdarkmodifier-lightdark--undefined)).
+
+---
+
+## `getLightDark(modifier): LightDark | undefined`
+
+Whether a two-context modifier is written with CSS `light-dark()`, and which context is which, read from
+`$extensions["com.toghen"].css.lightDark`:
+
+```json
+"theme": {
+  "default": "day",
+  "contexts": { "day": [], "night": [] },
+  "$extensions": { "com.toghen": { "css": { "lightDark": { "light": "day", "dark": "night" } } } }
+}
+```
+
+| Member | Meaning |
+|---|---|
+| `light` | The context that is the first argument of `light-dark()` |
+| `dark` | The context that is the second |
+
+Returns `{ light, dark }`, or `undefined` when the modifier has no `css.lightDark`. `modifier` is a resolver
+document's modifier (its `contexts` an object) or one from `collection.getModifiers()` (its `contexts` an array of
+names); the names are the keys or the items.
+
+Throws `ResolverValidationError` when `lightDark` is not an object; `light` or `dark` is missing or not a string;
+`light` equals `dark`; either is not one of the modifier's contexts; the modifier does not have exactly two
+contexts; or the same `css` member also gives `selector`, `atRule` or `contexts` (two spellings for one modifier).
 
 ---
 
@@ -1332,7 +1362,7 @@ All are named exports supporting `instanceof` checks.
 | `InvalidModeError` | Collection access | Specified mode doesn't exist |
 | `CollectionNotFoundError` | `DesignSystem` | A lookup path names no collection, and the system has more than one |
 | `CircularReferenceError` | Resolution engine | Token references create a cycle |
-| `ResolverValidationError` | `Resolver` constructor, `getContextSelector()` | Wrong `version`, invalid modifier structure, a name occurring twice in `resolutionOrder` (inline or by `$ref`; sets and modifiers share the namespace); a modifier's CSS spelling that is not a string, or an `atRule` that does not start with `@` |
+| `ResolverValidationError` | `Resolver` constructor, `getContextSelector()`, `getLightDark()` | Wrong `version`, invalid modifier structure, a name occurring twice in `resolutionOrder` (inline or by `$ref`; sets and modifiers share the namespace); a modifier's CSS spelling that is not a string, or an `atRule` that does not start with `@`; a `lightDark` that is malformed, names a non-context, sits on a modifier without exactly two contexts, or sits beside another spelling |
 | `InvalidInputError` | `Resolver.resolve()`, `valueAt()` | Unknown modifier key, non-string value, missing required selection |
 | `InvalidReferenceError` | `Resolver.resolve()`, `load()`, `contextsOf()` | Unresolvable `$ref`, pointer to `#/resolutionOrder/…`, modifier referencing modifier; a file `load` cannot read or parse; a generated chain path that collides with a token |
 

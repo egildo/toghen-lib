@@ -58,3 +58,45 @@ export function getContextSelector(
     ...(atRule !== undefined ? { atRule } : {}),
   };
 }
+
+export interface LightDark {
+  /** The context that is the first argument of `light-dark()`. */
+  light: string;
+  /** The context that is the second. */
+  dark: string;
+}
+
+/**
+ * The pair a modifier is written with `light-dark()` from, read from
+ * `$extensions["com.toghen"].css.lightDark`, or `undefined` when it has none.
+ *
+ * @param modifier - A modifier from a resolver document (its `contexts` an object), or one a
+ *   collection records (its `contexts` an array of names)
+ * @throws {ResolverValidationError} When `lightDark` is not an object with a string `light` and `dark`,
+ *   the two are the same, either is not a context, the modifier has not exactly two contexts,
+ *   or the same `css` also gives a `selector`, an `atRule` or `contexts`
+ */
+export function getLightDark(modifier: { name?: string; contexts?: unknown; $extensions?: Record<string, any> }): LightDark | undefined {
+  const css = modifier.$extensions?.['com.toghen']?.css;
+  if (!css || css.lightDark === undefined) return undefined;
+
+  const where = `The CSS lightDark of modifier '${modifier.name ?? ''}'`;
+  const pair = css.lightDark;
+  if (typeof pair !== 'object' || pair === null || Array.isArray(pair))
+    throw new ResolverValidationError(`${where} must be an object { light, dark }.`);
+  for (const key of ['light', 'dark'])
+    if (typeof pair[key] !== 'string') throw new ResolverValidationError(`${where}: ${key} must be a string.`);
+  const { light, dark } = pair as LightDark;
+  if (light === dark) throw new ResolverValidationError(`${where}: light and dark are both '${light}'.`);
+
+  const contexts = Array.isArray(modifier.contexts) ? modifier.contexts : Object.keys(modifier.contexts ?? {});
+  for (const key of ['light', 'dark'] as const)
+    if (!contexts.includes(pair[key]))
+      throw new ResolverValidationError(
+        `${where}: ${key} names '${pair[key]}', which is not one of its contexts (${contexts.join(', ')}).`,
+      );
+  if (contexts.length !== 2) throw new ResolverValidationError(`${where} needs exactly two contexts, has ${contexts.length}.`);
+  for (const key of ['selector', 'atRule', 'contexts'])
+    if (css[key] !== undefined) throw new ResolverValidationError(`${where} cannot sit beside ${key}: one modifier, one spelling.`);
+  return { light, dark };
+}
