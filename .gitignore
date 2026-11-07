@@ -20,7 +20,11 @@ package-lock.json
 
 # Typedoc builds
 .typedoc/
-.specify/
+# speckit: generated, except the constitution, copied from house
+.specify/*
+!.specify/memory/
+.specify/memory/*
+!.specify/memory/constitution.md
 .claude/
 CLAUDE.md
 CLAUDE.local.md
