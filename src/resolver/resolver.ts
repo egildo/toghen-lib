@@ -708,7 +708,9 @@ export class Resolver {
   /**
    * Collects all effective modifiers available to the resolver.
    * Includes top-level `doc.modifiers` and inline modifiers declared in
-   * `resolutionOrder`.
+   * `resolutionOrder`. A top-level modifier carries the overrides written beside
+   * the `$ref` that names it in `resolutionOrder`, as `resolve()` applies them,
+   * so its default and contexts are the same in every answer.
    */
   private collectEffectiveModifiers(): Map<string, ResolverModifier> {
     const modifiers = new Map<string, ResolverModifier>();
@@ -718,7 +720,14 @@ export class Resolver {
     }
 
     for (const item of this.doc.resolutionOrder) {
-      if (!isReferenceObject(item) && (item as Partial<InlineModifier>).type === 'modifier' && (item as Partial<InlineModifier>).name) {
+      if (isReferenceObject(item)) {
+        const { $ref, ...overrides } = item;
+        const named = /^#\/modifiers\/([^/]+)$/.exec($ref);
+        const name = named && unescapePointerSegment(named[1]);
+        if (name && modifiers.has(name) && Object.keys(overrides).length > 0) {
+          modifiers.set(name, shallowMerge(modifiers.get(name)!, overrides));
+        }
+      } else if ((item as Partial<InlineModifier>).type === 'modifier' && (item as Partial<InlineModifier>).name) {
         const inline = item as InlineModifier;
         modifiers.set(inline.name, inline);
       }
@@ -982,9 +991,10 @@ export class Resolver {
       throw new ResolverValidationError('Resolver document must declare a "resolutionOrder" array.');
     }
 
-    // Validate modifiers
-    for (const [name, modifier] of Object.entries(this.doc.modifiers ?? {})) {
-      this.validateModifier(name, modifier);
+    // Validate modifiers, with the overrides beside the $ref that names each
+    const effective = this.collectEffectiveModifiers();
+    for (const name of Object.keys(this.doc.modifiers ?? {})) {
+      this.validateModifier(name, effective.get(name)!);
     }
 
     // Validate resolutionOrder items

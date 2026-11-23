@@ -912,3 +912,51 @@ describe('Resolver — a design system versioning itself', () => {
     assert.strictEqual(withSetExtensions({ 'com.toghen': { version: '  1.4.0\n' } }).getDeclaredVersion(), '1.4.0');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Overrides beside a $ref in resolutionOrder (Resolver §4.2: they MUST be treated as overrides)
+// ---------------------------------------------------------------------------
+
+describe('Resolver — overrides beside a $ref, honoured everywhere resolve() honours them', () => {
+  const WHITE = { colorSpace: 'srgb', components: [1, 1, 1] };
+  const BLACK = { colorSpace: 'srgb', components: [0, 0, 0] };
+  const GREY = { colorSpace: 'srgb', components: [0.5, 0.5, 0.5] };
+  const doc = (ref: Record<string, unknown>): ResolverDocument => ({
+    version: '2025-11-01',
+    name: 'ds',
+    sets: { base: { sources: [{ bg: { $type: 'color', $value: WHITE } }] } },
+    modifiers: { theme: { default: 'light', contexts: { light: [], dark: [{ bg: { $value: BLACK } }] } } },
+    resolutionOrder: [{ $ref: '#/sets/base' }, { $ref: '#/modifiers/theme', ...ref }],
+  });
+
+  it('takes a default given beside the $ref as the default', () => {
+    const resolver = new Resolver(doc({ default: 'dark' }));
+    assert.deepEqual(resolver.resolve({}).bg.$value, BLACK);
+    assert.equal(resolver.getModeName({}), 'dark');
+    assert.deepEqual(resolver.getModifiers(), [{ name: 'theme', contexts: ['light', 'dark'], default: 'dark' }]);
+    assert.deepEqual(resolver.valueAt('bg', {}), BLACK);
+
+    const collection = resolver.resolveContextsToDesignSystem().getCollection('ds')!;
+    assert.deepEqual(collection.getModes(), ['dark', 'light']);
+    assert.equal(collection.getDefaultMode(), 'dark');
+    assert.deepEqual(collection.getToken('bg')!.$value, BLACK);
+    assert.equal(collection.modeNamed('theme=light'), 'light');
+    assert.equal(resolver.resolveAllToDesignSystem().getCollection('ds')!.getDefaultMode(), 'dark');
+  });
+
+  it('takes contexts given beside the $ref as the contexts, replaced whole', () => {
+    const resolver = new Resolver(doc({ contexts: { light: [], dim: [{ bg: { $value: GREY } }] } }));
+    assert.deepEqual(resolver.resolve({ theme: 'dim' }).bg.$value, GREY);
+    assert.deepEqual(resolver.getPermutations(), [{ theme: 'light' }, { theme: 'dim' }]);
+    assert.deepEqual(resolver.valueAt('bg', { theme: 'dim' }), GREY);
+    assert.deepEqual(resolver.dependsOn('bg'), { direct: ['theme'], through: [] });
+    assert.throws(() => resolver.resolve({ theme: 'dark' }), InvalidInputError);
+
+    const system = resolver.resolveContextsToDesignSystem();
+    assert.deepEqual(system.resolveValue('ds.bg', 'theme=dim'), GREY);
+  });
+
+  it('refuses a default given beside the $ref that names no context', () => {
+    assert.throws(() => new Resolver(doc({ default: 'dusk' })), ResolverValidationError);
+  });
+});

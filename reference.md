@@ -802,6 +802,7 @@ new Resolver(document: ResolverDocument)
 - A `TokenSource` is an inline token tree or a `ReferenceObject`, `{ "$ref": "…" }`.
 - A `ResolutionOrderItem` is a `ReferenceObject` naming `#/sets/<name>` or `#/modifiers/<name>`, or an `InlineSet` / `InlineModifier`, `{ name, type: 'set' | 'modifier', sources | contexts }`.
 - `Resolver` follows same-document pointers only (RFC 6901: `~1` is `/`, `~0` is `~`); a pointer to a file is inlined first by [`load`](#loadentry-options-promiseloadresult).
+- Keys beside a `$ref` override what it names, shallowly: an object or array given there replaces the one it names whole. A modifier's `default` or `contexts` given beside its `$ref` in `resolutionOrder` is its default and its contexts in every answer: `resolve()`, `getModifiers()`, `getPermutations()`, mode names, the builds and the per-modifier queries.
 - `ResolverModifierDef` is an alias of `ResolverModifier`.
 
 A `ResolverInput` is `Record<string, string>`: a modifier name to a context name, matched regardless of case. It is what `resolve()`, `resolveToDesignSystem()`, `getModeName()` and the query methods that take an input take.
