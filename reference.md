@@ -932,11 +932,12 @@ The full name (`dark/compact`) keeps working. `Collection.modeNamed()` does the 
 
 ### `getModeName(input): string`
 
-The canonical mode name for a set of modifier selections: context values joined with `/` in the order the document declares its modifiers (the order of [`getModifiers()`](#getmodifiersorder-modemodifier)), so the name never depends on the input object's key order. An omitted modifier contributes its `default`. A modifier with no `default` and no selection contributes nothing: `getModeName()` leaves it out of the name, where `resolve()` would refuse it.
+The canonical mode name for a set of modifier selections: context values joined with `/` in the order the document declares its modifiers (the order of [`getModifiers()`](#getmodifiersorder-modemodifier)), so the name never depends on the input object's key order. An omitted modifier contributes its `default`. A modifier with no `default` and no selection contributes nothing: `getModeName()` leaves it out of the name, where `resolve()` would refuse it. Names are matched as `resolve()` matches them, regardless of case, and the name spells each context as the document does; an unknown modifier or context throws `InvalidInputError`, as in `resolve()`.
 
 ```typescript
 // modifiers: theme (default 'light'), density (default 'cosy')
 resolver.getModeName({ theme: 'dark' });                     // 'dark/cosy'
+resolver.getModeName({ Theme: 'DARK' });                     // 'dark/cosy'
 resolver.getModeName({ density: 'compact', theme: 'dark' }); // 'dark/compact'
 resolver.getModeName({});                                    // 'light/cosy'
 ```

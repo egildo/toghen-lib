@@ -339,8 +339,9 @@ export class Resolver {
 
     const contextsOf = (input: ResolverInput): Record<string, string> => {
       const contexts: Record<string, string> = {};
+      const chosen = this.spelled(input);
       for (const [modifierName, modifier] of this.collectEffectiveModifiers()) {
-        const context = input[modifierName] ?? modifier.default;
+        const context = chosen[modifierName] ?? modifier.default;
         if (context !== undefined) contexts[modifierName] = context;
       }
       return contexts;
@@ -371,8 +372,9 @@ export class Resolver {
    *
    * A document with no modifiers has exactly one context, named `'default'`.
    *
-   * @param input - Modifier context selections; omitted modifiers use their default
-   * @returns A stable mode name, e.g. `'dark'` or `'dark/compact'`
+   * @param input - Modifier context selections, matched regardless of case; omitted modifiers use their default
+   * @returns A stable mode name, e.g. `'dark'` or `'dark/compact'`, each context as the document spells it
+   * @throws {InvalidInputError} For an unknown modifier or context, as {@link resolve} does
    *
    * @example
    * ```typescript
@@ -384,12 +386,29 @@ export class Resolver {
    */
   public getModeName(input: ResolverInput): string {
     const modifiers = this.collectEffectiveModifiers();
+    const chosen = this.spelled(input);
 
     const parts = Array.from(modifiers.entries())
-      .map(([modifierName, modifier]) => input[modifierName] ?? modifier.default)
+      .map(([modifierName, modifier]) => chosen[modifierName] ?? modifier.default)
       .filter((context): context is string => context !== undefined);
 
     return parts.length === 0 ? 'default' : parts.join('/');
+  }
+
+  /**
+   * The input with each modifier and context as the document spells them, matched without regard to case as
+   * `resolve()` matches them. An omitted modifier is left out.
+   *
+   * @throws {InvalidInputError} As `resolve()` does, for an unknown modifier or context, or a value that is not a string
+   */
+  private spelled(input: ResolverInput): Record<string, string> {
+    const modifiers = this.collectEffectiveModifiers();
+    return Object.fromEntries(
+      Object.entries(this.validateAndNormalizeInput(input, false)).map(([name, context]) => [
+        name,
+        Object.keys(modifiers.get(name)!.contexts).find((c) => c.toLowerCase() === context)!,
+      ]),
+    );
   }
 
   /** Document name, if set. */

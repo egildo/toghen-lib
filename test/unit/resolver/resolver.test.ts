@@ -960,3 +960,45 @@ describe('Resolver — overrides beside a $ref, honoured everywhere resolve() ho
     assert.throws(() => new Resolver(doc({ default: 'dusk' })), ResolverValidationError);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Names in an input match as resolve() matches them, without regard to case (Resolver §5.1)
+// ---------------------------------------------------------------------------
+
+describe('Resolver — modifier and context names match without regard to case, as the document spells them', () => {
+  const WHITE = { colorSpace: 'srgb', components: [1, 1, 1] };
+  const BLACK = { colorSpace: 'srgb', components: [0, 0, 0] };
+  const doc = (): ResolverDocument => ({
+    version: '2025-11-01',
+    name: 'ds',
+    sets: {
+      base: { sources: [{ bg: { $type: 'color', $value: WHITE }, gap: { $type: 'dimension', $value: { value: 4, unit: 'px' } } }] },
+    },
+    modifiers: {
+      theme: { default: 'light', contexts: { light: [], dark: [{ bg: { $value: BLACK } }] } },
+      density: { default: 'regular', contexts: { regular: [], compact: [{ gap: { $value: { value: 2, unit: 'px' } } }] } },
+    },
+    resolutionOrder: [{ $ref: '#/sets/base' }, { $ref: '#/modifiers/theme' }, { $ref: '#/modifiers/density' }],
+  });
+
+  it('names a mode by the contexts as the document spells them', () => {
+    const resolver = new Resolver(doc());
+    assert.equal(resolver.getModeName({ Theme: 'DARK' }), 'dark/regular');
+    assert.equal(resolver.getModeName({ THEME: 'dark', Density: 'Compact' }), 'dark/compact');
+    assert.throws(() => resolver.getModeName({ tone: 'warm' }), InvalidInputError);
+  });
+
+  it('builds a combination named in any case as the one the document spells', () => {
+    const combinations: Array<Record<string, string>> = [
+      { Theme: 'dark', density: 'compact' },
+      { theme: 'DARK', DENSITY: 'Compact' },
+    ];
+    for (const combination of combinations) {
+      const system = new Resolver(doc()).resolveContextsToDesignSystem([combination]);
+      const collection = system.getCollection('ds')!;
+      assert.ok(collection.getModes().includes('dark/compact'), collection.getModes().join(', '));
+      assert.deepEqual(system.resolveValue('ds.bg', 'theme=dark density=compact'), BLACK);
+      assert.deepEqual(system.resolveValue('ds.gap', 'theme=dark density=compact'), { value: 2, unit: 'px' });
+    }
+  });
+});
