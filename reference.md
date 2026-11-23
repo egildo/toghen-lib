@@ -818,7 +818,7 @@ A `ResolverInput` is `Record<string, string>`: a modifier name to a context name
 
 Why the document is shaped this way, and the stages it goes through, are in [specs.md](./specs.md#w3c-resolver-module).
 
-Validates the document on construction. Throws `ResolverValidationError` if the document is invalid. Safe to create once and call `resolve()` many times with different inputs.
+Validates the document on construction. Throws `ResolverValidationError` if the document is invalid. Safe to create once and call `resolve()` many times with different inputs. The resolver keeps a frozen copy of the document: a change to the document afterwards does not reach it, and what it gives out from the document (a chain's values, a modifier's `$extensions`, a group's attributes in a build) is frozen, so changing it in place throws a `TypeError`.
 
 ### `name` (getter)
 

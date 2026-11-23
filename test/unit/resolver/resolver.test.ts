@@ -1081,6 +1081,34 @@ describe('Resolver — what it gives out shares nothing with the document', () =
     assert.deepEqual(resolver.resolve().bg.$extensions, { 'org.example': { note: 'kept' } });
   });
 
+  it('gives out chains and modifiers through which neither the document nor a later answer changes', () => {
+    const document = doc();
+    document.modifiers = {
+      theme: { default: 'light', contexts: { light: [], dark: [{ bg: { $value: { colorSpace: 'srgb', components: [0, 0, 0] } } }] } },
+    };
+    document.resolutionOrder.push({ $ref: '#/modifiers/theme' });
+    const resolver = new Resolver(document);
+    const chains = resolver.contextsOf('bg').chains;
+    tryToChange(() => {
+      (chains.$value!.base as any).components[0] = 0.5;
+    });
+    tryToChange(() => {
+      (chains.$extensions!.base as any)['org.example'].note = 'changed';
+    });
+
+    assert.deepEqual((document.sets!.base.sources[0] as any).bg.$value.components, [1, 1, 1]);
+    assert.deepEqual((document.sets!.base.sources[0] as any).bg.$extensions, { 'org.example': { note: 'kept' } });
+    assert.deepEqual(resolver.valueAt('bg', {}), { colorSpace: 'srgb', components: [1, 1, 1] });
+    assert.deepEqual(resolver.contextsOf('bg').chains.$extensions!.base, { 'org.example': { note: 'kept' } });
+  });
+
+  it('reads the document as it was when the resolver was made', () => {
+    const document = doc();
+    const resolver = new Resolver(document);
+    (document.sets!.base.sources[0] as any).bg.$value.components[0] = 0;
+    assert.deepEqual(resolver.resolve().bg.$value.components, [1, 1, 1]);
+  });
+
   it('gives out tokens through which neither the document nor the stored token changes', () => {
     const document = doc();
     const system = new Resolver(document).resolveToDesignSystem();

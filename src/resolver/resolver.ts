@@ -111,6 +111,15 @@ function deepMergeTokenStructures(base: Record<string, any>, incoming: Record<st
   return result;
 }
 
+/** Freezes a value and everything in it. */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const member of Object.values(value)) deepFreeze(member);
+  }
+  return value;
+}
+
 // ---------------------------------------------------------------------------
 // Resolver
 // ---------------------------------------------------------------------------
@@ -175,7 +184,9 @@ export class Resolver {
    *   - A modifier's `default` does not exist in its `contexts`
    */
   constructor(document: ResolverDocument) {
-    this.doc = document;
+    // A frozen copy: what the caller does to its document afterwards does not reach the resolver, and what the
+    // resolver gives out (a chain's values, a modifier's `$extensions`) cannot change it.
+    this.doc = deepFreeze(structuredClone(document));
     this.validateDocument();
   }
 
@@ -209,13 +220,13 @@ export class Resolver {
    * ```
    */
   public resolve(input: ResolverInput = {}): Record<string, any> {
-    // The merge shares the document's own objects, so the caller gets a copy it may change.
+    // The merge shares the resolver's frozen copy of the document, so the caller gets a copy it may change.
     return structuredClone(this.merged(input));
   }
 
   /**
-   * `resolve()` without the copy: the merged structure, which shares objects with the document. For the builds,
-   * which copy what they keep as they load it.
+   * `resolve()` without the copy: the merged structure, which shares the frozen objects of the resolver's copy of the
+   * document. For the builds, which keep a token's value as a copy, and a group's attributes as they are, frozen.
    */
   private merged(input: ResolverInput): Record<string, any> {
     // Stage 1 — input validation
@@ -986,8 +997,7 @@ export class Resolver {
    */
   private loadTokensIntoCollection(obj: Record<string, any>, collection: Collection, pathParts: string[] = [], mode?: string): void {
     // The root of a source may carry `$extensions` (a parts vocabulary for every group below), as a group does.
-    // A group's attributes are copied, as a token is, so the collection shares nothing with the document.
-    if (pathParts.length === 0 && obj.$extensions) collection.setGroupAttribute('', '$extensions', structuredClone(obj.$extensions), mode);
+    if (pathParts.length === 0 && obj.$extensions) collection.setGroupAttribute('', '$extensions', obj.$extensions, mode);
 
     for (const [key, value] of Object.entries(obj)) {
       if (key.startsWith('$')) continue; // skip DTCG meta-keys at group level
@@ -1004,7 +1014,7 @@ export class Resolver {
         for (const attribute of ['$type', '$description', '$extensions', '$deprecated']) {
           // A falsy attribute is an attribute: `$deprecated: false` says the group is not deprecated.
           if (value[attribute] !== undefined) {
-            collection.setGroupAttribute(currentPath.join('.'), attribute, structuredClone(value[attribute]), mode);
+            collection.setGroupAttribute(currentPath.join('.'), attribute, value[attribute], mode);
           }
         }
         this.loadTokensIntoCollection(value, collection, currentPath, mode);
