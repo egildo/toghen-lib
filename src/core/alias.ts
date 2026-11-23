@@ -147,7 +147,7 @@ function unresolvable(
  * @returns The fully resolved value
  *
  * @throws {UnresolvableReferenceError} When a reference names no token, names a
- *   group, or is malformed
+ *   group, or is malformed, or is a JSON Pointer `$ref`, which is not supported yet
  * @throws {CircularReferenceError} When references form a cycle
  * @throws {InvalidInterpolationError} When a non-scalar is interpolated into a
  *   string
@@ -190,6 +190,17 @@ function walk(value: unknown, ctx: AliasContext): unknown {
   }
 
   if (value !== null && typeof value === 'object') {
+    // W3C §7.1.2's other reference syntax. Walked as a plain object it would come back as the object itself,
+    // which no type reads, so it is refused by name until it is supported.
+    if ('$ref' in value) {
+      const pointer = String((value as { $ref: unknown }).$ref);
+      throw unresolvable(
+        pointer,
+        ctx,
+        'unsupported',
+        'a JSON Pointer $ref (W3C DTCG §7.1.2) is not supported yet; write the reference as {path}',
+      );
+    }
     const resolved: Record<string, unknown> = {};
     for (const [key, member] of Object.entries(value as Record<string, unknown>)) {
       resolved[key] = walk(member, descend(ctx, key));

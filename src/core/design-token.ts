@@ -80,14 +80,15 @@ export class CircularReferenceError extends Error {
  * - `group`      — the path names a group, not a token (W3C DTCG §7.1.1)
  * - `no-value`   — the target exists but carries no `$value`
  * - `malformed`  — the reference text is not a usable path (empty, `{a..b}`, …)
+ * - `unsupported` — the reference is a JSON Pointer `$ref` (W3C DTCG §7.1.2), not supported yet
  */
-export type UnresolvableReferenceReason = 'not-found' | 'group' | 'no-value' | 'malformed';
+export type UnresolvableReferenceReason = 'not-found' | 'group' | 'no-value' | 'malformed' | 'unsupported';
 
 /**
  * Structured details attached to an {@link UnresolvableReferenceError}.
  */
 export interface UnresolvableReferenceDetails {
-  /** The reference exactly as written, braces included — e.g. `'{color.blue}'`. */
+  /** The reference exactly as written, braces included — e.g. `'{color.blue}'`; for a `$ref`, its pointer. */
   reference: string;
   /** Collection-relative path of the token that contained the reference. */
   tokenPath: string;

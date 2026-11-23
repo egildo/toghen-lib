@@ -243,6 +243,7 @@ The W3C format requires tools to report unresolvable and circular references
 | Path names a group, not a token (§7.1.1) | `UnresolvableReferenceError` | `group` |
 | Target carries no `$value` | `UnresolvableReferenceError` | `no-value` |
 | Path shape can never name a token (`{a..b}`, `{$x}`) | `UnresolvableReferenceError` | `malformed` |
+| A JSON Pointer `$ref` as a value or a member (§7.1.2), not supported yet | `UnresolvableReferenceError` | `unsupported` |
 | Reference chain loops | `CircularReferenceError` | — |
 | Non-scalar interpolated into a string | `InvalidInterpolationError` | — |
 
@@ -1031,5 +1032,5 @@ Completed items are in [decisions.md](./decisions.md#completed).
 
 ### Future
 - [ ] Dangling references in the document-wide check, which lists holes, non-factorable tokens and incomplete tokens today
-- [ ] JSON Pointer `$ref` references (§7.1.2) and `$extends` (§6.4)
+- [ ] JSON Pointer `$ref` references (§7.1.2) and `$extends` (§6.4). Until then a `$ref` in a `$value` is stored as written and refused when it is read, with `UnresolvableReferenceError` and the reason `unsupported`.
 - [ ] Schema versioning / migration utilities
