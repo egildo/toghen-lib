@@ -15,6 +15,11 @@ import { Resolver } from '../../../src/resolver/resolver.js';
 import { ResolverValidationError, InvalidInputError, InvalidReferenceError } from '../../../src/resolver/errors.js';
 import type { ResolverDocument } from '../../../src/resolver/types.js';
 
+// The W3C structured shapes, as the format writes them: a colour as { colorSpace, components }, a dimension as
+// { value, unit }. Plain strings alone once hid a serialisation bug.
+const srgb = (r: number, g: number, b: number) => ({ colorSpace: 'srgb', components: [r, g, b] });
+const px = (value: number) => ({ value, unit: 'px' });
+
 // ---------------------------------------------------------------------------
 // Fixtures / helpers
 // ---------------------------------------------------------------------------
@@ -33,7 +38,7 @@ const singleSetDoc = (): ResolverDocument => ({
       sources: [
         {
           colors: {
-            primary: { $value: '#0000ff', $type: 'color' },
+            primary: { $value: srgb(0, 0, 1), $type: 'color' },
           },
         },
       ],
@@ -50,7 +55,7 @@ const themeDoc = (): ResolverDocument => ({
       sources: [
         {
           colors: {
-            primary: { $value: '#0000ff', $type: 'color' },
+            primary: { $value: srgb(0, 0, 1), $type: 'color' },
           },
         },
       ],
@@ -59,8 +64,8 @@ const themeDoc = (): ResolverDocument => ({
   modifiers: {
     theme: {
       contexts: {
-        light: [{ colors: { background: { $value: '#ffffff', $type: 'color' } } }],
-        dark: [{ colors: { background: { $value: '#000000', $type: 'color' } } }],
+        light: [{ colors: { background: { $value: srgb(1, 1, 1), $type: 'color' } } }],
+        dark: [{ colors: { background: { $value: srgb(0, 0, 0), $type: 'color' } } }],
       },
       default: 'light',
     },
@@ -136,7 +141,7 @@ describe('Resolver — document validation', () => {
           modifiers: {
             singleCtx: {
               contexts: {
-                light: [{ colors: { bg: { $value: '#fff', $type: 'color' } } }],
+                light: [{ colors: { bg: { $value: srgb(1, 1, 1), $type: 'color' } } }],
               },
             },
           },
@@ -358,7 +363,7 @@ describe('Resolver — ordering and merging', () => {
     const resolver = new Resolver(singleSetDoc());
     const result = resolver.resolve();
 
-    assert.equal(result.colors.primary.$value, '#0000ff');
+    assert.deepEqual(result.colors.primary.$value, srgb(0, 0, 1));
     assert.equal(result.colors.primary.$type, 'color');
   });
 
@@ -368,38 +373,38 @@ describe('Resolver — ordering and merging', () => {
       sets: {
         base: {
           sources: [
-            { colors: { primary: { $value: '#0000ff', $type: 'color' } } },
-            { colors: { primary: { $value: '#ff0000', $type: 'color' } } }, // override
+            { colors: { primary: { $value: srgb(0, 0, 1), $type: 'color' } } },
+            { colors: { primary: { $value: srgb(1, 0, 0), $type: 'color' } } }, // override
           ],
         },
       },
       resolutionOrder: [{ $ref: '#/sets/base' }],
     });
     const result = resolver.resolve();
-    assert.equal(result.colors.primary.$value, '#ff0000');
+    assert.deepEqual(result.colors.primary.$value, srgb(1, 0, 0));
   });
 
   it('later sets override earlier sets in resolutionOrder', () => {
     const resolver = new Resolver({
       version: '2025-11-01',
       sets: {
-        base: { sources: [{ colors: { bg: { $value: '#fff', $type: 'color' } } }] },
-        override: { sources: [{ colors: { bg: { $value: '#000', $type: 'color' } } }] },
+        base: { sources: [{ colors: { bg: { $value: srgb(1, 1, 1), $type: 'color' } } }] },
+        override: { sources: [{ colors: { bg: { $value: srgb(0, 0, 0), $type: 'color' } } }] },
       },
       resolutionOrder: [{ $ref: '#/sets/base' }, { $ref: '#/sets/override' }],
     });
     const result = resolver.resolve();
-    assert.equal(result.colors.bg.$value, '#000');
+    assert.deepEqual(result.colors.bg.$value, srgb(0, 0, 0));
   });
 
   it('modifier applies the selected context tokens', () => {
     const resolver = new Resolver(themeDoc());
 
     const lightResult = resolver.resolve({ theme: 'light' });
-    assert.equal(lightResult.colors.background.$value, '#ffffff');
+    assert.deepEqual(lightResult.colors.background.$value, srgb(1, 1, 1));
 
     const darkResult = resolver.resolve({ theme: 'dark' });
-    assert.equal(darkResult.colors.background.$value, '#000000');
+    assert.deepEqual(darkResult.colors.background.$value, srgb(0, 0, 0));
   });
 
   it('modifier result overrides base tokens when ordered later', () => {
@@ -407,14 +412,14 @@ describe('Resolver — ordering and merging', () => {
       version: '2025-11-01',
       sets: {
         base: {
-          sources: [{ colors: { background: { $value: '#aaaaaa', $type: 'color' } } }],
+          sources: [{ colors: { background: { $value: srgb(0.667, 0.667, 0.667), $type: 'color' } } }],
         },
       },
       modifiers: {
         theme: {
           contexts: {
-            light: [{ colors: { background: { $value: '#ffffff', $type: 'color' } } }],
-            dark: [{ colors: { background: { $value: '#000000', $type: 'color' } } }],
+            light: [{ colors: { background: { $value: srgb(1, 1, 1), $type: 'color' } } }],
+            dark: [{ colors: { background: { $value: srgb(0, 0, 0), $type: 'color' } } }],
           },
           default: 'light',
         },
@@ -424,7 +429,7 @@ describe('Resolver — ordering and merging', () => {
 
     const result = resolver.resolve({ theme: 'dark' });
     // Modifier (later) should win over base set (earlier)
-    assert.equal(result.colors.background.$value, '#000000');
+    assert.deepEqual(result.colors.background.$value, srgb(0, 0, 0));
   });
 
   it('groups tokens are deep-merged across sets, not replaced wholesale', () => {
@@ -435,8 +440,8 @@ describe('Resolver — ordering and merging', () => {
           sources: [
             {
               colors: {
-                primary: { $value: '#0000ff', $type: 'color' },
-                secondary: { $value: '#00ff00', $type: 'color' },
+                primary: { $value: srgb(0, 0, 1), $type: 'color' },
+                secondary: { $value: srgb(0, 1, 0), $type: 'color' },
               },
             },
           ],
@@ -446,7 +451,7 @@ describe('Resolver — ordering and merging', () => {
             {
               colors: {
                 // overrides only primary, secondary must survive
-                primary: { $value: '#ff0000', $type: 'color' },
+                primary: { $value: srgb(1, 0, 0), $type: 'color' },
               },
             },
           ],
@@ -456,8 +461,8 @@ describe('Resolver — ordering and merging', () => {
     });
 
     const result = resolver.resolve();
-    assert.equal(result.colors.primary.$value, '#ff0000'); // overridden
-    assert.equal(result.colors.secondary.$value, '#00ff00'); // preserved
+    assert.deepEqual(result.colors.primary.$value, srgb(1, 0, 0)); // overridden
+    assert.deepEqual(result.colors.secondary.$value, srgb(0, 1, 0)); // preserved
   });
 
   it('inline sets work correctly in resolutionOrder', () => {
@@ -467,12 +472,12 @@ describe('Resolver — ordering and merging', () => {
         {
           name: 'inlineBase',
           type: 'set',
-          sources: [{ spacing: { sm: { $value: '4px', $type: 'dimension' } } }],
+          sources: [{ spacing: { sm: { $value: px(4), $type: 'dimension' } } }],
         },
       ],
     });
     const result = resolver.resolve();
-    assert.equal(result.spacing.sm.$value, '4px');
+    assert.deepEqual(result.spacing.sm.$value, px(4));
   });
 
   it('inline modifiers work correctly in resolutionOrder', () => {
@@ -483,15 +488,15 @@ describe('Resolver — ordering and merging', () => {
           name: 'theme',
           type: 'modifier',
           contexts: {
-            light: [{ colors: { bg: { $value: '#fff', $type: 'color' } } }],
-            dark: [{ colors: { bg: { $value: '#000', $type: 'color' } } }],
+            light: [{ colors: { bg: { $value: srgb(1, 1, 1), $type: 'color' } } }],
+            dark: [{ colors: { bg: { $value: srgb(0, 0, 0), $type: 'color' } } }],
           },
           default: 'light',
         },
       ],
     });
     const darkResult = resolver.resolve({ theme: 'dark' });
-    assert.equal(darkResult.colors.bg.$value, '#000');
+    assert.deepEqual(darkResult.colors.bg.$value, srgb(0, 0, 0));
   });
 });
 
@@ -504,13 +509,13 @@ describe('Resolver — $ref resolution', () => {
     const resolver = new Resolver(singleSetDoc());
     const result = resolver.resolve();
     assert.ok(result.colors);
-    assert.equal(result.colors.primary.$value, '#0000ff');
+    assert.deepEqual(result.colors.primary.$value, srgb(0, 0, 1));
   });
 
   it('resolves a $ref to a named modifier', () => {
     const resolver = new Resolver(themeDoc());
     const result = resolver.resolve({ theme: 'dark' });
-    assert.equal(result.colors.background.$value, '#000000');
+    assert.deepEqual(result.colors.background.$value, srgb(0, 0, 0));
   });
 
   it('applies $ref overrides shallowly', () => {
@@ -519,7 +524,7 @@ describe('Resolver — $ref resolution', () => {
       version: '2025-11-01',
       sets: {
         base: {
-          sources: [{ spacing: { sm: { $value: '4px', $type: 'dimension' } } }],
+          sources: [{ spacing: { sm: { $value: px(4), $type: 'dimension' } } }],
           description: 'original description',
         },
       },
@@ -540,10 +545,10 @@ describe('Resolver — $ref resolution', () => {
       version: '2025-11-01',
       sets: {
         lightTokens: {
-          sources: [{ colors: { bg: { $value: '#fff', $type: 'color' } } }],
+          sources: [{ colors: { bg: { $value: srgb(1, 1, 1), $type: 'color' } } }],
         },
         darkTokens: {
-          sources: [{ colors: { bg: { $value: '#000', $type: 'color' } } }],
+          sources: [{ colors: { bg: { $value: srgb(0, 0, 0), $type: 'color' } } }],
         },
       },
       modifiers: {
@@ -559,10 +564,10 @@ describe('Resolver — $ref resolution', () => {
     });
 
     const light = resolver.resolve({ theme: 'light' });
-    assert.equal(light.colors.bg.$value, '#fff');
+    assert.deepEqual(light.colors.bg.$value, srgb(1, 1, 1));
 
     const dark = resolver.resolve({ theme: 'dark' });
-    assert.equal(dark.colors.bg.$value, '#000');
+    assert.deepEqual(dark.colors.bg.$value, srgb(0, 0, 0));
   });
 
   it('throws InvalidReferenceError for external (non-same-document) $ref', () => {
@@ -656,7 +661,7 @@ describe('Resolver — alias tokens', () => {
           sources: [
             {
               colors: {
-                primary: { $value: '#0000ff', $type: 'color' },
+                primary: { $value: srgb(0, 0, 1), $type: 'color' },
                 cta: { $value: '{colors.primary}', $type: 'color' },
               },
             },
@@ -762,7 +767,7 @@ describe('Resolver document metadata', () => {
       version: '2025-11-01',
       name: 'demo',
       description: 'Starter design system — every token type, both themes.',
-      sets: { base: { sources: [{ a: { $type: 'color', $value: '#000000' } }] } },
+      sets: { base: { sources: [{ a: { $type: 'color', $value: srgb(0, 0, 0) } }] } },
       resolutionOrder: [{ $ref: '#/sets/base' }],
     });
 
@@ -773,7 +778,7 @@ describe('Resolver document metadata', () => {
   it('leaves both undefined when the document omits them', () => {
     const resolver = new Resolver({
       version: '2025-11-01',
-      sets: { base: { sources: [{ a: { $type: 'color', $value: '#000000' } }] } },
+      sets: { base: { sources: [{ a: { $type: 'color', $value: srgb(0, 0, 0) } }] } },
       resolutionOrder: [{ $ref: '#/sets/base' }],
     });
 
@@ -791,7 +796,7 @@ describe('Resolver — a design system versioning itself', () => {
       sets: {
         base: {
           $extensions: extensions,
-          sources: [{ a: { $type: 'color', $value: '#000000' } }],
+          sources: [{ a: { $type: 'color', $value: srgb(0, 0, 0) } }],
         },
       },
       resolutionOrder: [{ $ref: '#/sets/base' }],
@@ -814,7 +819,7 @@ describe('Resolver — a design system versioning itself', () => {
     const resolver = new Resolver({
       version: '2025-11-01',
       name: 'demo',
-      sets: { base: { sources: [{ a: { $type: 'color', $value: '#000000' } }] } },
+      sets: { base: { sources: [{ a: { $type: 'color', $value: srgb(0, 0, 0) } }] } },
       resolutionOrder: [{ $ref: '#/sets/base' }],
     });
 
@@ -824,13 +829,13 @@ describe('Resolver — a design system versioning itself', () => {
   it('reads a version a modifier declares', () => {
     const resolver = new Resolver({
       version: '2025-11-01',
-      sets: { base: { sources: [{ a: { $type: 'color', $value: '#000000' } }] } },
+      sets: { base: { sources: [{ a: { $type: 'color', $value: srgb(0, 0, 0) } }] } },
       modifiers: {
         theme: {
           $extensions: { 'com.toghen': { version: '2.0.0-rc.1' } },
           contexts: {
-            light: [{ b: { $type: 'color', $value: '#ffffff' } }],
-            dark: [{ b: { $type: 'color', $value: '#111111' } }],
+            light: [{ b: { $type: 'color', $value: srgb(1, 1, 1) } }],
+            dark: [{ b: { $type: 'color', $value: srgb(0.067, 0.067, 0.067) } }],
           },
           default: 'light',
         },
@@ -851,7 +856,7 @@ describe('Resolver — a design system versioning itself', () => {
           name: 'base',
           type: 'set',
           $extensions: { 'com.toghen': { version: '0.9.0' } },
-          sources: [{ a: { $type: 'color', $value: '#000000' } }],
+          sources: [{ a: { $type: 'color', $value: srgb(0, 0, 0) } }],
         },
       ],
     } as unknown as ResolverDocument);
@@ -867,11 +872,11 @@ describe('Resolver — a design system versioning itself', () => {
       sets: {
         base: {
           $extensions: { 'com.toghen': { version: '1.0.0' } },
-          sources: [{ a: { $type: 'color', $value: '#000000' } }],
+          sources: [{ a: { $type: 'color', $value: srgb(0, 0, 0) } }],
         },
         extra: {
           $extensions: { 'com.toghen': { version: '9.9.9' } },
-          sources: [{ b: { $type: 'color', $value: '#ffffff' } }],
+          sources: [{ b: { $type: 'color', $value: srgb(1, 1, 1) } }],
         },
       },
       resolutionOrder: [{ $ref: '#/sets/base' }, { $ref: '#/sets/extra' }],
