@@ -718,7 +718,7 @@ brace is text" (issue #129). Data files are JSON and component files KDL; both a
 
 ## Fixed: what the review of 23 November 2026 found (23 November 2026)
 
-**Status:** built; not released yet.
+**Status:** done, in 0.2.0.
 
 **Where it comes from.** The review is house's `.reference/plans/workspace/review-2026-11-23.md`, and the round's plan, `plan-2026-11-23-review-fixes.md`, is beside it. A probe proved each defect. Each fix is its own commit, with a test in the structured shapes.
 
