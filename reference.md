@@ -1436,11 +1436,11 @@ Any further member, keyed by a CSS property in camelCase
 a finite number. The lib does not check that the key is a property; the PostCSS
 plugin does, and the Figma adapter leaves it out of the text style.
 
-`fontFamily` is one family name or a font stack, `['Inter', 'sans-serif']`. A
-stack must not be empty, and every entry must be a non-empty string. A
-`{reference}` to a `fontFamily` token is a string like any other, and resolves
-to whatever that token holds. `getFontFamily()` returns the stored value, a
-string or an array; it does not flatten a stack.
+`fontFamily` is one family name or a font stack, `['Inter', 'sans-serif']`, checked as a `fontFamily` token is
+(see [Token values](#token-values)). A `{reference}` to a `fontFamily` token is a string like any other: as the
+whole member it resolves to whatever that token holds, and as an entry of a stack it is spread into the stack,
+`['{font.base}', 'serif']` becoming `['Inter', 'Arial', 'serif']`. `getFontFamily()` returns the stored value, a
+string or an array.
 
 ### `ShadowValue`
 
@@ -1733,7 +1733,7 @@ says why: `'<text>' cannot be computed: <reason>`. The principle is in
 | `letterSpacing` | [`LetterSpacingValue`](#letterspacingvalue) | A number and a unit, `'-0.021em'`, `'2px'`, `'0.1rem'`, and `'0'` as `0px`; the unit may be in any case and is stored lower case. The same functions as `dimension`; `em` mixes only with `em` (`calc(0.1em - 0.02em)` is `0.08em`). A typography member's `letterSpacing` may reference one |
 | `fontWeight` | A number from 1 to 1000 | A W3C keyword in any case (`thin` 100, `light` 300, `normal` 400, `medium` 500, `semi-bold` 600, `bold` 700, `black` 900, `extra-black` 950, and their aliases), which becomes its number; a numeric string or a `calc()` (`'calc(400 + 300)'`) |
 | `border` | [`BorderValue`](#bordervalue) | `color` any colour string, `width` any `dimension` string, `style` a W3C keyword or `{ dashArray, lineCap }`, each dash any `dimension` string |
-| `fontFamily` | A string (one family) or an array of strings | A string with a comma outside quotes, `"'Inter', system-ui, sans-serif"`, which becomes the array by [`fontFamilyNames`](#fontfamilynames) |
+| `fontFamily` | A non-empty string (one family) or a non-empty array of non-empty strings | A string with a comma outside quotes, `"'Inter', system-ui, sans-serif"`, which becomes the array by [`fontFamilyNames`](#fontfamilynames). A stack inside the array, which a reference to a stack puts there (`['{font.base}', 'serif']`), is spread into it when the reference resolves. Refused: an empty string, an empty array, an entry that is not a non-empty string, any other shape |
 | `shadow`, `typography`, `gradient` | Their [interfaces](#composite-value-interfaces) | Members may use the string forms above, and every member is stored computed: a shadow's `color: '#abc'` is a structured colour with `hex: '#aabbcc'`, `'16px'` is `{ value: 16, unit: 'px' }`, a typography `fontWeight` keyword is its number, a gradient `angle` is a number of degrees. A shadow's, a gradient stop's and a border's colour take `transparent`, and keep `currentColor` as the string |
 
 **A token defined in one context only** (in a modifier context's source and in no base set) exists in the modes that context reaches and nowhere else: elsewhere `getToken()` and `resolveToken()` return `null`, `resolveValue()` throws that the token is not found, and the default mode does not hold it. It is a hole of its chain, and [`Collection.check()`](#check-check) lists it as incomplete, with the modes it lacks.

@@ -3,13 +3,13 @@ import type { TokenTypeHandler } from './handler.js';
 import { holdsReference } from '../core/alias-syntax.js';
 import { borderHandler } from './border-handler.js';
 import { colorHandler } from './color-handler.js';
+import { fontFamilyHandler } from './font-family-handler.js';
 import { fontWeightHandler } from './font-weight-handler.js';
 import { dimensionHandler } from './dimension-handler.js';
 import { letterSpacingHandler } from './letter-spacing-handler.js';
 import { gradientHandler } from './gradient-handler.js';
 import { shadowHandler } from './shadow-handler.js';
 import { typographyHandler } from './typography-handler.js';
-import { fontFamilyNames, isFontFamilyList } from '../utils/font-family.js';
 
 /**
  * The types whose shape lib owns: the W3C ones, and `letterSpacing`, a Toghen extension. They are checked on every path a token
@@ -19,6 +19,7 @@ const builtIn: Record<string, TokenTypeHandler> = {
   border: borderHandler,
   color: colorHandler,
   dimension: dimensionHandler,
+  fontFamily: fontFamilyHandler,
   fontWeight: fontWeightHandler,
   gradient: gradientHandler,
   letterSpacing: letterSpacingHandler,
@@ -50,13 +51,6 @@ export function normalizeTokenValue(type: string, value: unknown, path: string):
  * @internal
  */
 export function computeTokenValue(type: string, value: unknown, path: string): unknown {
-  if (type === 'fontFamily' && typeof value === 'string' && isFontFamilyList(value)) {
-    try {
-      return fontFamilyNames(value);
-    } catch (e) {
-      throw new InvalidTokenError(`Token "${path}": ${(e as Error).message}`);
-    }
-  }
   const handler = builtIn[type];
   if (!handler) return value;
   // The handlers throw plain errors that already name the token; the class says it is the token that is wrong.

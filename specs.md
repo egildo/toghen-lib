@@ -711,7 +711,7 @@ The rulings on the errors of `valueAt`, the open names and the document-wide che
 
 **A token's value is checked however it enters.** Every path into a system (`DesignSystem.setToken()`, `Collection.setToken()`, a resolver document) ends in `Collection.setToken()`, and the check runs there.
 
-**The W3C types are lib's, not the caller's.** `color`, `dimension`, `fontWeight`,
+**The W3C types are lib's, not the caller's.** `color`, `dimension`, `fontFamily`, `fontWeight`,
 `border`, `shadow`, `typography` and `gradient` are checked whether or not a handler is registered
 for them: their shape is a fact about the format, not a choice a system makes.
 A registered handler adds methods, and may add its own `validate()`.
@@ -764,7 +764,7 @@ The rule is one exported function, `fontFamilyNames(value): string[]`. A string 
 
 It is applied in two places:
 
-- **On load**, a `fontFamily` token's string with a comma outside quotes is converted to the array, as other string forms are (see above), and so is a typography member's. A string with none stays a string, the format's own single-family form.
+- **On load**, a `fontFamily` token's string with a comma outside quotes is converted to the array, as other string forms are (see above), and so is a typography member's. A string with none stays a string, the format's own single-family form. The value is checked there too, by the font family handler: a non-empty name, or a non-empty list of non-empty names. A reference to a stack written as an entry of a list (`['{font.base}', 'serif']`) is spread into the list when it resolves, since the format's family is a list of names and never a list of lists.
 - **On read**, by every adapter: the PostCSS plugin's font-family spelling and the Figma adapter's `toFigmaFontFamily` take the names from `fontFamilyNames()`. That covers what load cannot see: a family reached through an untyped token by reference.
 
 A quoted part keeps a comma inside it (`"'Foo, Bar', serif"` is two names, `Foo, Bar` and `serif`), since the quotes say where the name ends.
@@ -860,6 +860,7 @@ runs.
 - **Dimension**: a string (`'16px'`, `'calc(1rem + 2px)'`) is computed by the numeric grammar (`src/utils/css-math.ts`) into `{ value, unit }`; a structured dimension is checked.
 - **Letter spacing**: the same, with units `px`, `rem` and `em`: `'-0.021em'` becomes `{ value: -0.021, unit: 'em' }`.
 - **Font weight**: a W3C keyword becomes its number; a number or a numeric string is checked from 1 to 1000.
+- **Font family**: a string with a comma outside quotes becomes a list; a name, a list and every name in it must not be empty; a stack inside a list is spread into it.
 - **Typography, shadow, gradient, border**: every member goes through its family's gate and is stored computed. An error names the member (`color`, `0.blur`, `stops.1.color`).
 
 The colour reader and the numeric grammar are the two families. Each has one parser, and both gates call it, so a

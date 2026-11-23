@@ -167,6 +167,15 @@ for (const [name, enter] of Object.entries(paths)) {
       assert.equal(enter('letterSpacing', '{ds.other}'), '{ds.other}');
     });
 
+    it('checks a font family: a non-empty name, or a non-empty list of them', () => {
+      assert.equal(enter('fontFamily', 'Inter'), 'Inter');
+      assert.deepEqual(enter('fontFamily', ['Inter', 'sans-serif']), ['Inter', 'sans-serif']);
+      assert.deepEqual(enter('fontFamily', "'Plex Sans', system-ui"), ['Plex Sans', 'system-ui']);
+      for (const value of ['', '  ', [], [1, {}], ['Inter', ''], { a: 1 }, 400]) {
+        assert.throws(() => enter('fontFamily', value), /Token "ds\.t": fontFamily/, JSON.stringify(value));
+      }
+    });
+
     it('refuses a value of the wrong shape, naming the token', () => {
       assert.throws(() => enter('color', 'reddish'), /Token "ds\.t": 'reddish' cannot be computed: it is not a CSS colour\./);
       assert.throws(() => enter('dimension', '24'), /Token "ds\.t": a dimension string must be a number and a unit/);
@@ -185,5 +194,40 @@ describe('a token typed by its group', () => {
       resolutionOrder: [{ $ref: '#/sets/base' }],
     } as never);
     assert.throws(() => resolver.resolveToDesignSystem(), /Token "ds\.space\.bad"/);
+  });
+});
+
+describe('a font family that refers to a stack', () => {
+  it('spreads the stack into the list it stands in, in a fontFamily token and a typography member', () => {
+    const resolver = new Resolver({
+      version: '2025-11-01',
+      name: 'ds',
+      sets: {
+        base: {
+          sources: [
+            {
+              font: {
+                base: { $type: 'fontFamily', $value: ['Inter', 'Arial'] },
+                body: { $type: 'fontFamily', $value: ['{font.base}', 'serif'] },
+                deep: { $type: 'fontFamily', $value: ['Plex', '{font.body}'] },
+              },
+              type: {
+                body: {
+                  $type: 'typography',
+                  $value: { fontFamily: ['{font.base}', 'serif'], fontSize: { value: 16, unit: 'px' }, fontWeight: 400, lineHeight: 1.5 },
+                },
+              },
+            },
+          ],
+        },
+      },
+      resolutionOrder: [{ $ref: '#/sets/base' }],
+    } as never);
+    const system = resolver.resolveToDesignSystem();
+
+    assert.deepEqual(system.resolveValue('ds.font.body'), ['Inter', 'Arial', 'serif']);
+    assert.deepEqual(system.resolveValue('ds.font.deep'), ['Plex', 'Inter', 'Arial', 'serif']);
+    assert.deepEqual(system.resolveValue('ds.type.body.fontFamily'), ['Inter', 'Arial', 'serif']);
+    assert.deepEqual(resolver.valueAt('font.body'), ['Inter', 'Arial', 'serif']);
   });
 });
