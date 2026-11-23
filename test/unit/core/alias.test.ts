@@ -549,6 +549,18 @@ describe('alias resolution — partial-string interpolation', () => {
     assert.strictEqual(resolve(collection, 'text'), 'color-mix(in srgb, oklch(0.4 0.1 250) 5%, color(display-p3 1 0 0 / 0.5))');
   });
 
+  it('spells a structured colour from its space and components, never from a hex that says otherwise', () => {
+    const collection = build('theme', {
+      // The hex is a fallback, and here a stale one: the components are the colour.
+      'color.red': new DesignToken({ colorSpace: 'srgb', components: [1, 0, 0], hex: '#0000ff' }, 'color'),
+      'color.p3': new DesignToken({ colorSpace: 'display-p3', components: [0, 1, 0], hex: '#00ff00' }, 'color'),
+      'color.fine': new DesignToken({ colorSpace: 'srgb', components: [0.25, 0.5, 0.75], hex: '#4080bf' }, 'color'),
+      text: new DesignToken('{color.red} {color.p3} {color.fine}', 'string'),
+    });
+
+    assert.strictEqual(resolve(collection, 'text'), '#ff0000 color(display-p3 0 1 0) color(srgb 0.25 0.5 0.75)');
+  });
+
   it('interpolates transparent as #00000000, not #0000000000', () => {
     const collection = build('theme', {
       'color.clear': new DesignToken('transparent', 'color'),

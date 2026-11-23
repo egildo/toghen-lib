@@ -367,7 +367,8 @@ function interpolate(value: string, ctx: AliasContext): string {
  * Narrows a resolved value to something that can appear inside a string.
  *
  * A dimension is written back as `${value}${unit}`; a structured colour of any
- * space by `spellCssColor` (its `hex` when it has one, else CSS Color 4 syntax). Other objects and arrays are refused rather than stringified — letting them through
+ * space by `spellCssColor` (from its components: a hex when it was written as one and a hex says it exactly, else
+ * CSS Color 4 syntax). Other objects and arrays are refused rather than stringified — letting them through
  * is what produced `"[object Object]"` in generated CSS.
  *
  * @internal

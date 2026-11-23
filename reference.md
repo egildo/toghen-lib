@@ -1737,10 +1737,12 @@ once it resolves. It is checked and computed when it resolves, by
 [`valueAt()`](#method-valueat), in each mode, and a value its type cannot compute throws there.
 
 A reference embedded in a longer string interpolates a dimension as `'24px'`
-and a structured colour of any space as CSS: its `hex` when it carries one, with
-the alpha byte appended to a six-digit hex when the alpha is below 1 (so
-`transparent` is `#00000000`), otherwise CSS Color 4 syntax in its own space
-(`oklch(0.7 0.1 200)`). Lib's colour reader reads every such spelling back, so
+and a structured colour of any space as CSS, spelled from its space, components
+and alpha, never from its `hex`, which W3C makes a fallback. An sRGB colour that
+carries a `hex`, and whose channels and alpha are whole bytes, is the hex those
+give, with the alpha byte appended when the alpha is below 1 (so `transparent` is
+`#00000000`); any other is CSS Color 4 syntax in its own space
+(`oklch(0.7 0.1 200)`, `color(srgb 0 0 0 / 0.5)`). Lib's colour reader reads every such spelling back, so
 `'color-mix(in oklch, {ink} 40%, white)'` computes whatever space `ink` is in. A
 token whose own value holds a reference is inserted as its resolved string. The
 library refuses to interpolate any other object.

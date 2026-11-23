@@ -282,6 +282,13 @@ describe('spellCssColor', () => {
     });
   });
 
+  it('spells a colour with a hex in its own space when a hex would round it', () => {
+    const veil: ColorValue = { colorSpace: 'srgb', components: [0, 0, 0], alpha: 0.5, hex: '#000000' };
+    assert.equal(spellCssColor(veil), 'color(srgb 0 0 0 / 0.5)');
+    roundTrip(veil);
+    assert.equal(spellCssColor({ colorSpace: 'srgb', components: [0.25, 0.5, 0.75], hex: '#4080bf' }), 'color(srgb 0.25 0.5 0.75)');
+  });
+
   it('spells transparent as #00000000, never with a second alpha byte', () => {
     const clear: ColorValue = { colorSpace: 'srgb', components: [0, 0, 0], alpha: 0, hex: '#00000000' };
     assert.equal(spellCssColor(clear), '#00000000');
