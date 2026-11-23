@@ -30,7 +30,7 @@ asks them, one command each.
 | **refs** | What a token or a raw value refers to, member by member; which modifiers a token depends on, directly and through references | `DesignSystem.referencesOf`, `referencesIn`, `holdsReference`, `referenceTarget`, `parseReferencePath`, `Resolver.dependsOn` |
 | **parts** | The parts a path passes through, its component, its twins and rest; the part a group is; the vocabulary in force; a component's axes in precedence order | `Collection.partsOf`, `partAt`, `vocabularyAt`, `axesOf` |
 | **applies** | Under a selection of part values, which token supplies each key of a component | `Collection.applies` |
-| **check** | The holes, the non-factorable tokens and the tokens incomplete in some mode, in one call; two sources of one set or context giving one token a value | `Collection.check`, `load` (its collisions) |
+| **check** | The holes, the non-factorable tokens, the tokens incomplete in some mode and the tokens with one CSS name, in one call; two sources of one set or context giving one token a value | `Collection.check`, `load` (its collisions) |
 | **css** | The names two adapters share: a token's custom property, a chain link's, a context's spelling | `cssPropertyName`, `cssIdentifier`, `cssLinkName`, `getContextSelector` |
 
 A consumer that needs something else asks for it to be added here, once a second consumer asks it too; until then
@@ -973,6 +973,12 @@ adapters call it, so the CSS adapter's link and the Figma code syntax agree; bef
 `--surface-raised--colorScheme` and `--surface-raised--color-scheme`.
 Paths already in lowercase and hyphens, the common case, keep their names.
 Whitespace still becomes `-`.
+
+**A property name is an identifier.** `cssPropertyName()` escapes, with a backslash, what an identifier cannot
+hold, as `cssLinkName()` does: `ds.size.1/2` is `--size-1\/2` and `ds.opacity.50%` is `--opacity-50\%`, where they
+were invalid CSS before. A name that is already an identifier is unchanged. The rule still maps two paths to one
+name, `a.b` and `a-b`, `bgColor` and `bg-color`; rather than change every name to keep them apart,
+`Collection.check()` reports them, in `sameCssName`, and the author renames one.
 
 **Open: a configurable rule.** `@toghen/postcss` takes a `propertyName`
 function, and a function cannot reach the Figma plugin, which reads documents.

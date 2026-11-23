@@ -542,15 +542,17 @@ hand. An adapter that needs the per-modifier questions
 
 #### `check(): Check`
 
-What is wrong with the collection's tokens, in one call: the tokens with no value in some mode and, for a
-collection a resolver built, the holes of every chain and every non-factorable token. A token added by hand, which
-the resolver's document does not hold, is checked for its modes only.
+What is wrong with the collection's tokens, in one call: the tokens with no value in some mode, the tokens
+[`cssPropertyName`](#csspropertyname) gives one custom-property name, and, for a collection a resolver built, the
+holes of every chain and every non-factorable token. A token added by hand, which the resolver's document does not
+hold, is checked for its modes and its name only.
 
 ```typescript
 collection.check();
 // { incomplete: [{ path: 'card.glow', missingModes: ['low/light', 'high/light'] }],
 //   holes: [{ path: 'card.glow', property: '$value', holes: [{ theme: 'light' }] }, …],
-//   nonFactorable: [{ path: 'card.shadow', property: '$value', reason: 'partial-composite', … }] }
+//   nonFactorable: [{ path: 'card.shadow', property: '$value', reason: 'partial-composite', … }],
+//   sameCssName: [{ name: '--space-a-b', paths: ['space.a.b', 'space.a-b'] }] }
 ```
 
 ```typescript
@@ -558,6 +560,7 @@ interface Check {
   incomplete: Array<{ path: string; missingModes: string[] }>;
   holes: Array<{ path: string; property: LeafProperty; holes: Array<Record<string, string>> }>;
   nonFactorable: NonFactorable[];
+  sameCssName: Array<{ name: string; paths: string[] }>; // in document order, the paths of each name too
 }
 ```
 
@@ -1578,9 +1581,10 @@ Reads a `lineHeight`: a number or numeric string is a `ratio` of the font size, 
 cssPropertyName(lookupPath: string): string
 cssPropertyName('ds.surface.accent');         // '--surface-accent'
 cssPropertyName('ds.button.backgroundColor'); // '--button-background-color'
+cssPropertyName('ds.size.1/2');               // '--size-1\\/2'
 ```
 
-A token's CSS custom-property name, `--` included: the token path without the collection segment, each segment spelled by [`cssIdentifier`](#cssidentifier), joined by `-`. `@toghen/postcss` names properties with it by default, and the Figma adapter writes the same name as a variable's code syntax.
+A token's CSS custom-property name, `--` included: the token path without the collection segment, each segment spelled by [`cssIdentifier`](#cssidentifier), joined by `-`. What an identifier cannot hold is escaped with a backslash, as `cssLinkName` escapes it: every character but a letter, a digit, `_`, `-` and a non-ASCII one. A name that is already an identifier is unchanged. Two paths may still give one name (`space.a.b` and `space.a-b`, `bgColor` and `bg-color`); [`check()`](#check-check) lists them in `sameCssName`. `@toghen/postcss` names properties with it by default, and the Figma adapter writes the same name as a variable's code syntax.
 
 ### `cssLinkName`
 

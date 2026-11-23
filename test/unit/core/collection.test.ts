@@ -195,3 +195,21 @@ describe('Collection: a name the Object prototype holds is an ordinary name', ()
     );
   });
 });
+
+describe('Collection.check: two tokens with one CSS custom-property name', () => {
+  it('reports the tokens that cssPropertyName spells alike, in document order', () => {
+    const collection = new Collection('ds');
+    const GAP = { value: 4, unit: 'px' };
+    const RED = { colorSpace: 'srgb', components: [1, 0, 0] };
+    collection.setToken('space.a.b', new DesignToken(GAP, 'dimension'));
+    collection.setToken('space.a-b', new DesignToken(GAP, 'dimension'));
+    collection.setToken('bgColor', new DesignToken(RED, 'color'));
+    collection.setToken('bg-color', new DesignToken(RED, 'color'));
+    collection.setToken('ink', new DesignToken(RED, 'color'));
+
+    assert.deepStrictEqual(collection.check().sameCssName, [
+      { name: '--space-a-b', paths: ['space.a.b', 'space.a-b'] },
+      { name: '--bg-color', paths: ['bgColor', 'bg-color'] },
+    ]);
+  });
+});

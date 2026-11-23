@@ -2,6 +2,7 @@ import { DesignToken, InvalidTokenError, InvalidModeError, PathNotFoundError } f
 import type { LeafProperty, NonFactorable, TokenContexts } from '../resolver/chains.js';
 import { normalizeTokenValue } from '../handlers/built-in.js';
 import type { Resolver } from '../resolver/resolver.js';
+import { cssPropertyName } from '../utils/css-name.js';
 
 /**
  * Defines the structure for a group of tokens, which can contain other groups or tokens.
@@ -75,6 +76,8 @@ export interface Check {
   holes: Array<{ path: string; property: LeafProperty; holes: Array<Record<string, string>> }>;
   /** Tokens whose value one context overrides in part, so no chain can say it (a collection built from a resolver document). */
   nonFactorable: NonFactorable[];
+  /** Tokens `cssPropertyName` gives one custom-property name (`a.b` and `a-b`), each name with its paths in document order. */
+  sameCssName: Array<{ name: string; paths: string[] }>;
 }
 
 /**
@@ -918,7 +921,10 @@ export class Collection {
     const incomplete: Check['incomplete'] = [];
     const holes: Check['holes'] = [];
     const nonFactorable: NonFactorable[] = [];
+    const byCssName = new Map<string, string[]>();
     for (const path of this.tokenPaths('', undefined)) {
+      const name = cssPropertyName(`${this.name}.${path}`);
+      byCssName.set(name, [...(byCssName.get(name) ?? []), path]);
       const missingModes = this.modes.filter((mode) => !holdsValue(this.navigate(path), mode));
       if (missingModes.length > 0) incomplete.push({ path, missingModes });
       if (!this.resolver) continue;
@@ -935,7 +941,8 @@ export class Collection {
         if (chain && chain.holes.length > 0) holes.push({ path, property: property as LeafProperty, holes: chain.holes });
       }
     }
-    return { incomplete, holes, nonFactorable };
+    const sameCssName = [...byCssName].filter(([, paths]) => paths.length > 1).map(([name, paths]) => ({ name, paths }));
+    return { incomplete, holes, nonFactorable, sameCssName };
   }
 
   /**
