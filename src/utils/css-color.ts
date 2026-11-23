@@ -209,9 +209,14 @@ export function mixColors(
     if (to[channel] === undefined) to[channel] = from[channel];
   }
 
-  const mixed = interpolateWithPremultipliedAlpha([from as unknown as Color, to as unknown as Color], mode, {
-    h: { fixup: HUE_FIXUPS[hueMethod] },
-  } as never)(p2 / sum) as unknown as Channels;
+  // An end of the mix is that colour. culori returns its first colour as given at 0 and then
+  // divides it by alpha as if premultiplied, and a round trip at 1 adds float noise.
+  const t = p2 / sum;
+  const interpolate = () =>
+    interpolateWithPremultipliedAlpha([from as unknown as Color, to as unknown as Color], mode, {
+      h: { fixup: HUE_FIXUPS[hueMethod] },
+    } as never)(t) as unknown as Channels;
+  const mixed = t === 0 ? from : t === 1 ? to : interpolate();
 
   for (const channel of missingInBoth) mixed[channel] = undefined;
   if (sum < 100) mixed.alpha = (mixed.alpha ?? 1) * (sum / 100);

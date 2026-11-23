@@ -148,6 +148,27 @@ describe('parseCssColor: color-mix()', () => {
     assert.throws(() => parseCssColor('color-mix(in srgb, #000 -10%, #fff)'), /between 0% and 100%, got -10%/);
   });
 
+  it('gives a colour at 100% back exactly, either side, a translucent one included', () => {
+    const red: ColorValue = { colorSpace: 'srgb', components: [1, 0, 0], alpha: 0.5 };
+    assert.deepEqual(computed('color-mix(in srgb, rgb(255 0 0 / 0.5) 100%, blue)'), red);
+    assert.deepEqual(computed('color-mix(in srgb, blue 0%, rgb(255 0 0 / 0.5))'), red);
+    assert.deepEqual(computed('color-mix(in srgb, color(srgb 0.7 0.2 0.1 / 0.3), white 0%)'), {
+      colorSpace: 'srgb',
+      components: [0.7, 0.2, 0.1],
+      alpha: 0.3,
+    });
+    assert.deepEqual(computed('color-mix(in srgb, white 0%, color(srgb 0.7 0.2 0.1 / 0.3))'), {
+      colorSpace: 'srgb',
+      components: [0.7, 0.2, 0.1],
+      alpha: 0.3,
+    });
+    assert.deepEqual(computed('color-mix(in oklch, oklch(0.6 0.1 30 / 0.25) 100%, blue)'), {
+      colorSpace: 'oklch',
+      components: [0.6, 0.1, 30],
+      alpha: 0.25,
+    });
+  });
+
   it('reads a mix nested in a mix', () => {
     close(computed('color-mix(in srgb, color-mix(in srgb, #000000, #ffffff), #ffffff)'), {
       colorSpace: 'srgb',
