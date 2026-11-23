@@ -1496,7 +1496,7 @@ Both forms are accepted everywhere a gradient is read, and `normalizeGradient(va
 `NormalizedGradient` for either. An `angle` is stored as a number of degrees. Written as a string it may be in
 `deg`, `grad`, `rad` or `turn`, `calc()` included (`'0.25turn'` and `'calc(45deg + 0.125turn)'` are `90`); a unitless
 string is degrees, as a number is. A stop's colour takes any colour string; `currentColor` is kept as the string.
-A position lies in [0, 1].
+A position outside [0, 1] is clamped into it, as W3C §9.7 says: stored clamped on load, and clamped by `normalizeGradient`.
 
 ### `DimensionValue`
 

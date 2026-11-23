@@ -20,10 +20,12 @@ const computeStops = (stops: unknown, path: string, at: string): GradientStopVal
     if (typeof position !== 'number' || !Number.isFinite(position)) {
       throw new Error(`Token "${path}": ${at}${index}.position must be a finite number.`);
     }
-    if (position < 0 || position > 1) {
-      throw new Error(`Token "${path}": ${at}${index}.position must be between 0 and 1.`);
-    }
-    return { ...stop, color: computeMember(colorHandler.normalize!, color, path, `${at}${index}.color`) } as GradientStopValue;
+    // W3C §9.7: a position outside [0, 1] MUST be considered as if it were clamped to it.
+    return {
+      ...stop,
+      color: computeMember(colorHandler.normalize!, color, path, `${at}${index}.color`),
+      position: Math.min(1, Math.max(0, position)),
+    } as GradientStopValue;
   });
 };
 
@@ -43,7 +45,7 @@ export const gradientHandler: TokenTypeHandler = {
   /**
    * A gradient with every member computed, in the form it was written: each stop's `color`
    * through the colour gate, and in the object form the `angle` (`'0.25turn'`,
-   * `'calc(90deg + 0.25turn)'`) as a number of degrees. A position must lie in [0, 1].
+   * `'calc(90deg + 0.25turn)'`) as a number of degrees. A position outside [0, 1] is clamped into it (W3C §9.7).
    * An error names the member (`1.color`, `stops.1.color`, `angle`).
    */
   normalize: (value: unknown, path: string): GradientValue => {
