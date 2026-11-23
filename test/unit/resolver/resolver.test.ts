@@ -1032,3 +1032,63 @@ describe('Resolver — __proto__, constructor and valueOf are ordinary names in 
     assert.equal(({} as Record<string, unknown>).evil, undefined);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Safe sharing: what the resolver gives out is not the document
+// ---------------------------------------------------------------------------
+
+describe('Resolver — what it gives out shares nothing with the document', () => {
+  const tryToChange = (change: () => void) => {
+    try {
+      change();
+    } catch {
+      // refused: frozen, which is as safe as a copy
+    }
+  };
+  const doc = (): ResolverDocument => ({
+    version: '2025-11-01',
+    name: 'ds',
+    sets: {
+      base: {
+        sources: [
+          {
+            bg: {
+              $type: 'color',
+              $value: { colorSpace: 'srgb', components: [1, 1, 1] },
+              $extensions: { 'org.example': { note: 'kept' } },
+            },
+          },
+        ],
+      },
+    },
+    resolutionOrder: [{ $ref: '#/sets/base' }],
+  });
+
+  it('returns from resolve() a structure the caller may change', () => {
+    const document = doc();
+    const resolver = new Resolver(document);
+    const tokens = resolver.resolve();
+    tokens.bg.$value.components[0] = 0;
+    tokens.bg.$extensions['org.example'].note = 'changed';
+
+    assert.deepEqual((document.sets!.base.sources[0] as any).bg.$value.components, [1, 1, 1]);
+    assert.deepEqual(resolver.resolve().bg.$value.components, [1, 1, 1]);
+    assert.deepEqual(resolver.resolve().bg.$extensions, { 'org.example': { note: 'kept' } });
+  });
+
+  it('gives out tokens through which neither the document nor the stored token changes', () => {
+    const document = doc();
+    const system = new Resolver(document).resolveToDesignSystem();
+    const resolved = system.resolveToken('ds.bg')!;
+    tryToChange(() => {
+      resolved.$extensions!['org.example'].note = 'changed';
+    });
+    tryToChange(() => {
+      system.getCollection('ds')!.getToken('bg')!.$value.components[0] = 0;
+    });
+
+    assert.deepEqual((document.sets!.base.sources[0] as any).bg.$extensions, { 'org.example': { note: 'kept' } });
+    assert.deepEqual(system.getCollection('ds')!.getToken('bg')!.$extensions, { 'org.example': { note: 'kept' } });
+    assert.deepEqual(system.resolveValue('ds.bg'), { colorSpace: 'srgb', components: [1, 1, 1] });
+  });
+});

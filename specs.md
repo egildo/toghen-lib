@@ -71,7 +71,7 @@ The guiding principle is minimalism, powerful yet unobtrusive:
 `DesignToken` instances are immutable. A change is a new instance. This provides:
 
 - **Predictable state**: no side effects, easy data-flow tracing.
-- **Safe sharing**: tokens can be passed freely without fear of mutation.
+- **Safe sharing**: tokens can be passed freely without fear of mutation. A token's `$value` and `$extensions` are copied when it is made and frozen; a collection a resolver builds copies a group's attributes as it loads them; `resolve()` returns a copy, since the caller's document cannot be frozen. Freezing costs one pass when a token is made and nothing when it is read; a copy on every read cost more, measured on a document of 1,461 tokens and four modifiers (the product build about 25% slower frozen, about 50% slower copied on read). The copy `resolve()` makes costs about 1.3 ms a call there; the builds do not make it.
 - **Change detection**: trivial to diff for UI framework integration.
 
 #### Handler Pattern for Extensibility

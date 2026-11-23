@@ -195,7 +195,9 @@ export class Resolver {
    *   Case-insensitive; values must be strings.
    *   Modifiers with a `default` are optional in the input.
    *
-   * @returns A merged DTCG token object ready for further processing.
+   * @returns A merged DTCG token object ready for further processing, sharing
+   *   nothing with the document: changing it changes neither the document nor a
+   *   later `resolve()`.
    *
    * @throws {InvalidInputError} When the input is invalid for this document.
    * @throws {InvalidReferenceError} When a `$ref` cannot be resolved.
@@ -207,6 +209,15 @@ export class Resolver {
    * ```
    */
   public resolve(input: ResolverInput = {}): Record<string, any> {
+    // The merge shares the document's own objects, so the caller gets a copy it may change.
+    return structuredClone(this.merged(input));
+  }
+
+  /**
+   * `resolve()` without the copy: the merged structure, which shares objects with the document. For the builds,
+   * which copy what they keep as they load it.
+   */
+  private merged(input: ResolverInput): Record<string, any> {
     // Stage 1 — input validation
     const normalizedInput = this.validateAndNormalizeInput(input);
 
@@ -238,7 +249,7 @@ export class Resolver {
    * ```
    */
   public resolveToDesignSystem(input: ResolverInput = {}, system?: DesignSystem, collectionName?: string): DesignSystem {
-    const flatTokens = this.resolve(input);
+    const flatTokens = this.merged(input);
 
     const ds = system ?? new DesignSystem();
     const name = collectionName ?? this.doc.name ?? 'resolved';
@@ -337,7 +348,7 @@ export class Resolver {
     const collection = new Collection(name, modeNames);
 
     inputs.forEach((input, index) => {
-      this.loadTokensIntoCollection(this.resolve(input), collection, [], modeNames[index]);
+      this.loadTokensIntoCollection(this.merged(input), collection, [], modeNames[index]);
     });
 
     const contextsOf = (input: ResolverInput): Record<string, string> => {
@@ -614,7 +625,7 @@ export class Resolver {
     const ix = this.chainIndex();
     let early: Record<string, any> | undefined;
     const earlyRead = (p: string, prop: LeafProperty) => {
-      early ??= this.resolve(input);
+      early ??= this.merged(input);
       const node = p.split('.').reduce((o: any, k) => o?.[k], early);
       return node && Object.prototype.hasOwnProperty.call(node, prop) ? { v: node[prop] } : undefined;
     };
@@ -963,7 +974,8 @@ export class Resolver {
    */
   private loadTokensIntoCollection(obj: Record<string, any>, collection: Collection, pathParts: string[] = [], mode?: string): void {
     // The root of a source may carry `$extensions` (a parts vocabulary for every group below), as a group does.
-    if (pathParts.length === 0 && obj.$extensions) collection.setGroupAttribute('', '$extensions', obj.$extensions, mode);
+    // A group's attributes are copied, as a token is, so the collection shares nothing with the document.
+    if (pathParts.length === 0 && obj.$extensions) collection.setGroupAttribute('', '$extensions', structuredClone(obj.$extensions), mode);
 
     for (const [key, value] of Object.entries(obj)) {
       if (key.startsWith('$')) continue; // skip DTCG meta-keys at group level
@@ -980,7 +992,7 @@ export class Resolver {
         for (const attribute of ['$type', '$description', '$extensions', '$deprecated']) {
           // A falsy attribute is an attribute: `$deprecated: false` says the group is not deprecated.
           if (value[attribute] !== undefined) {
-            collection.setGroupAttribute(currentPath.join('.'), attribute, value[attribute], mode);
+            collection.setGroupAttribute(currentPath.join('.'), attribute, structuredClone(value[attribute]), mode);
           }
         }
         this.loadTokensIntoCollection(value, collection, currentPath, mode);

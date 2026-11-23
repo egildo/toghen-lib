@@ -102,7 +102,9 @@ new DesignToken(
 | `$description` | `string` | Human-readable description; `''` when none was given |
 | `$extensions` | `Record<string, any> \| null` | W3C extension data |
 
-A token has no methods. It is immutable: a change is a new `DesignToken`. What a token refers to is
+A token has no methods. It is immutable: a change is a new `DesignToken`. Its `$value` and `$extensions` are
+copied when it is made and frozen, so it shares nothing with what it was made from, and changing what it gives
+out in place throws a `TypeError`. What a token refers to is
 [`referencesOf()`](#referencesofpath-mode-tokenreference) for a stored token, and
 [`referencesIn()`](#referencesinvalue-collectionname-tokenreference) for any value.
 
@@ -867,7 +869,7 @@ string is ignored; surrounding whitespace is trimmed.
 
 ### `resolve(input?): Record<string, any>`
 
-Returns a flat DTCG token object. Token aliases (e.g., `{ $value: '{color.primary}' }`) are **preserved as strings**.
+Returns a flat DTCG token object. Token aliases (e.g., `{ $value: '{color.primary}' }`) are **preserved as strings**. The object is a copy and shares nothing with the document: changing it changes neither the document nor a later `resolve()`.
 
 ```typescript
 const tokens = resolver.resolve({ theme: 'dark' });

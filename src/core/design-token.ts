@@ -236,8 +236,9 @@ export class DesignToken {
   /**
    * Creates a new immutable DesignToken instance.
    *
-   * All values are deep cloned to ensure immutability, except for DesignToken instances
-   * which are preserved as-is since they are already immutable.
+   * `$value` and `$extensions` are deep cloned and frozen, except for DesignToken instances
+   * which are preserved as-is since they are already immutable: the token shares nothing
+   * with what it was made from, and nothing it gives out can change it.
    *
    * @param $value - The token's value (primitive, object, array, or reference string)
    * @param $type - The semantic type of the token
@@ -262,21 +263,22 @@ export class DesignToken {
    * ```
    */
   constructor($value: any, $type: string, $description = '', $extensions: Record<string, any> | null = null) {
-    this.$value = this.deepClone($value); // Deep clone for immutability
+    this.$value = this.deepClone($value);
     this.$type = $type;
     this.$description = $description;
-    this.$extensions = $extensions;
+    this.$extensions = $extensions === null ? null : this.deepClone($extensions);
   }
 
   /**
-   * Deep clones a value while preserving DesignToken instances for immutability.
+   * Deep clones and freezes a value while preserving DesignToken instances for immutability.
    *
    * This method recursively clones objects and arrays to ensure that modifications
-   * to the original value don't affect the token's stored value. DesignToken instances
-   * are preserved as-is since they are already immutable.
+   * to the original value don't affect the token's stored value, and freezes each
+   * clone so the value the token gives out cannot be changed in place. DesignToken
+   * instances are preserved as-is since they are already immutable.
    *
    * @param value - The value to clone (can be any type)
-   * @returns A deep clone of the value with DesignToken instances preserved
+   * @returns A frozen deep clone of the value with DesignToken instances preserved
    *
    * @private
    */
@@ -290,7 +292,7 @@ export class DesignToken {
     }
 
     if (Array.isArray(value)) {
-      return value.map((item) => this.deepClone(item));
+      return Object.freeze(value.map((item) => this.deepClone(item)));
     }
 
     const cloned: any = {};
@@ -299,6 +301,6 @@ export class DesignToken {
         cloned[key] = this.deepClone(value[key]);
       }
     }
-    return cloned;
+    return Object.freeze(cloned);
   }
 }
