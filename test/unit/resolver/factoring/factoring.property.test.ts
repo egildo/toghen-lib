@@ -1,7 +1,7 @@
 /**
  * Property test: for seeded random legal documents, every token the report
  * does not name agrees with `resolve()` at every point of `getPermutations()`,
- * property by property, and `step`, `valueAt` and `dependsOn` agree with the
+ * property by property, and the chains, `valueAt` and `dependsOn` agree with the
  * resolver and the DesignSystem. Corpora from the factoring spike.
  */
 import { describe, it } from 'node:test';
@@ -14,15 +14,23 @@ import { InvalidTokenError, PathNotFoundError } from '../../../../src/core/desig
 import { fourModifierFixture } from './fixtures.js';
 
 const SEEDS = 500;
-// biome-ignore lint/correctness/noUnusedVariables: `checked` is only ever written, never read, so the count of compared cells is never asserted; reported for a later round
-let checked = 0; // cells where valueAt was compared with the DesignSystem
 const PROPS: LeafProperty[] = ['$value', '$type', '$description', '$extensions'];
 
-const CORPORA: { name: string; opts: GenOptions; partialsPossible: boolean }[] = [
-  { name: 'all', opts: {}, partialsPossible: true },
-  { name: 'no aliases', opts: { aliases: false }, partialsPossible: true },
-  { name: 'no partials', opts: { partials: false }, partialsPossible: false },
-  { name: 'no aliases, no partials', opts: { aliases: false, partials: false }, partialsPossible: false },
+/**
+ * `cells`: of the cells where valueAt was asked, how many it was compared in with the DesignSystem, and how many
+ * were skipped because the DesignSystem of the whole document refused it. The corpora are seeded, so the counts are
+ * exact: a change that skips more cells, or compares none, shows here instead of passing in silence.
+ */
+const CORPORA: { name: string; opts: GenOptions; partialsPossible: boolean; cells: { compared: number; skipped: number } }[] = [
+  { name: 'all', opts: {}, partialsPossible: true, cells: { compared: 47395, skipped: 5321 } },
+  { name: 'no aliases', opts: { aliases: false }, partialsPossible: true, cells: { compared: 48863, skipped: 2927 } },
+  { name: 'no partials', opts: { partials: false }, partialsPossible: false, cells: { compared: 47012, skipped: 2050 } },
+  {
+    name: 'no aliases, no partials',
+    opts: { aliases: false, partials: false },
+    partialsPossible: false,
+    cells: { compared: 48304, skipped: 0 },
+  },
 ];
 
 /**
@@ -35,11 +43,16 @@ function rawValue(resolver: Resolver, path: string, input: Record<string, string
   return target ? (depth > 20 ? 'cycle' : rawValue(resolver, target, input, depth + 1)) : v;
 }
 
-/** Check one document; returns how many tokens the report named. */
-function checkDocument(doc: Parameters<typeof generate>[0] extends number ? ReturnType<typeof generate> : never, where: string): number {
+/** Check one document; returns how many tokens the report named, and how many cells valueAt was compared in or skipped. */
+function checkDocument(
+  doc: Parameters<typeof generate>[0] extends number ? ReturnType<typeof generate> : never,
+  where: string,
+): { reported: number; compared: number; skipped: number } {
   const resolver = new Resolver(doc);
   const perms = resolver.getPermutations();
   let reported = 0;
+  let compared = 0;
+  let skipped = 0;
   for (const path of allTokenPaths(resolver)) {
     // A chain's values come in the stored shape; a value its type rejects (a partial with nothing beneath it) is refused.
     let ctxs: ReturnType<Resolver['contextsOf']>;
@@ -82,9 +95,10 @@ function checkDocument(doc: Parameters<typeof generate>[0] extends number ? Retu
       if (!want) assert.throws(() => resolver.valueAt(path, input), PathNotFoundError, `${at} hole`);
       else {
         const expected = outcome(() => resolver.resolveToDesignSystem(input).resolveValue(`resolved.${path}`));
-        if (expected.ok) assert.deepEqual(got, expected, `${at} valueAt`);
-        else checked--;
-        checked++;
+        if (expected.ok) {
+          assert.deepEqual(got, expected, `${at} valueAt`);
+          compared++;
+        } else skipped++;
       }
       cells.set(JSON.stringify(input), rawValue(resolver, path, input));
     }
@@ -103,24 +117,35 @@ function checkDocument(doc: Parameters<typeof generate>[0] extends number ? Retu
               `${where} ${path} ${m} is not a dependency`,
             );
   }
-  return reported;
+  return { reported, compared, skipped };
 }
 
 describe('factoring: seeded random documents', () => {
   for (const corpus of CORPORA)
     it(`${SEEDS} seeds, corpus "${corpus.name}"`, () => {
       let reported = 0;
-      for (let seed = 1; seed <= SEEDS; seed++) reported += checkDocument(generate(seed, corpus.opts), `seed ${seed}`);
+      const cells = { compared: 0, skipped: 0 };
+      for (let seed = 1; seed <= SEEDS; seed++) {
+        const checked = checkDocument(generate(seed, corpus.opts), `seed ${seed}`);
+        reported += checked.reported;
+        cells.compared += checked.compared;
+        cells.skipped += checked.skipped;
+      }
       // the report is not vacuous, and it is silent when no composite is partial
       if (corpus.partialsPossible) assert.ok(reported > 0, 'the corpus never produced a partial composite');
       else assert.equal(reported, 0, 'a document without partial composites was reported');
+      // valueAt was compared where the corpus says, and skipped no more
+      assert.deepEqual(cells, corpus.cells);
     });
 });
 
 describe('factoring: four-modifier fixture', () => {
   it('reports only the shadow, and everything else agrees', () => {
     const doc = fourModifierFixture();
-    assert.equal(checkDocument(doc, 'fixture'), 1);
+    const { reported, compared, skipped } = checkDocument(doc, 'fixture');
+    assert.equal(reported, 1);
+    assert.ok(compared > 0, 'valueAt was compared in no cell');
+    assert.equal(skipped, 0, 'the fixture is a legal document, so no cell is skipped');
     assert.deepEqual(
       new Resolver(doc).contextsOf('shadow.card').nonFactorable.map((n) => n.path),
       ['shadow.card'],
