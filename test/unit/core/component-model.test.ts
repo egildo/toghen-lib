@@ -242,6 +242,6 @@ describe('the document-wide check', () => {
     const c = new Collection('c', ['light', 'dark']);
     c.setToken('bg', new DesignToken(srgb(1), 'color'), 'light');
     c.setToken('font', new DesignToken(['Inter'], 'fontFamily'));
-    assert.deepEqual(c.check(), { incomplete: [{ path: 'bg', missingModes: ['dark'] }], holes: [], nonFactorable: [] });
+    assert.deepEqual(c.check(), { incomplete: [{ path: 'bg', missingModes: ['dark'] }], holes: [], nonFactorable: [], sameCssName: [] });
   });
 });

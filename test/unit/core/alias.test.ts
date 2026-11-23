@@ -549,6 +549,18 @@ describe('alias resolution — partial-string interpolation', () => {
     assert.strictEqual(resolve(collection, 'text'), 'color-mix(in srgb, oklch(0.4 0.1 250) 5%, color(display-p3 1 0 0 / 0.5))');
   });
 
+  it('spells a structured colour from its space and components, never from a hex that says otherwise', () => {
+    const collection = build('theme', {
+      // The hex is a fallback, and here a stale one: the components are the colour.
+      'color.red': new DesignToken({ colorSpace: 'srgb', components: [1, 0, 0], hex: '#0000ff' }, 'color'),
+      'color.p3': new DesignToken({ colorSpace: 'display-p3', components: [0, 1, 0], hex: '#00ff00' }, 'color'),
+      'color.fine': new DesignToken({ colorSpace: 'srgb', components: [0.25, 0.5, 0.75], hex: '#4080bf' }, 'color'),
+      text: new DesignToken('{color.red} {color.p3} {color.fine}', 'string'),
+    });
+
+    assert.strictEqual(resolve(collection, 'text'), '#ff0000 color(display-p3 0 1 0) color(srgb 0.25 0.5 0.75)');
+  });
+
   it('interpolates transparent as #00000000, not #0000000000', () => {
     const collection = build('theme', {
       'color.clear': new DesignToken('transparent', 'color'),
@@ -662,5 +674,37 @@ describe('the reference grammar is public', () => {
       { at: '', to: 'color.ink', interpolated: true, written: '{color.ink}' },
     ]);
     assert.deepStrictEqual(lib.referencesIn(STACK), []);
+  });
+});
+
+describe('alias resolution — a JSON Pointer $ref (W3C §7.1.2)', () => {
+  it('refuses a $ref as a value or a member with a named error, never passing the object through', () => {
+    const system = new DesignSystem();
+    system.addCollection(
+      build('ds', {
+        blue: new DesignToken(BLUE, 'color'),
+        link: new DesignToken({ $ref: '#/blue/$value' }, 'color'),
+        red: new DesignToken({ $ref: '#/blue/$value/components/0' }, 'number'),
+        edge: new DesignToken({ color: { $ref: '#/blue/$value' }, width: PX16, style: 'solid' }, 'border'),
+      }),
+    );
+
+    for (const [path, at] of [
+      ['ds.link', '$value'],
+      ['ds.red', '$value'],
+      ['ds.edge', '$value.color'],
+    ]) {
+      assert.throws(
+        () => system.resolveValue(path),
+        (error: unknown) => {
+          assert.ok(error instanceof UnresolvableReferenceError, String(error));
+          assert.strictEqual(error.reason, 'unsupported');
+          assert.match(error.message, /JSON Pointer \$ref .* is not supported yet/);
+          assert.ok(error.message.includes(` at ${at} `), error.message);
+          return true;
+        },
+      );
+    }
+    assert.throws(() => system.resolveToken('ds.link'), UnresolvableReferenceError);
   });
 });

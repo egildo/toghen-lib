@@ -147,7 +147,7 @@ function unresolvable(
  * @returns The fully resolved value
  *
  * @throws {UnresolvableReferenceError} When a reference names no token, names a
- *   group, or is malformed
+ *   group, or is malformed, or is a JSON Pointer `$ref`, which is not supported yet
  * @throws {CircularReferenceError} When references form a cycle
  * @throws {InvalidInterpolationError} When a non-scalar is interpolated into a
  *   string
@@ -190,6 +190,17 @@ function walk(value: unknown, ctx: AliasContext): unknown {
   }
 
   if (value !== null && typeof value === 'object') {
+    // W3C §7.1.2's other reference syntax. Walked as a plain object it would come back as the object itself,
+    // which no type reads, so it is refused by name until it is supported.
+    if ('$ref' in value) {
+      const pointer = String((value as { $ref: unknown }).$ref);
+      throw unresolvable(
+        pointer,
+        ctx,
+        'unsupported',
+        'a JSON Pointer $ref (W3C DTCG §7.1.2) is not supported yet; write the reference as {path}',
+      );
+    }
     const resolved: Record<string, unknown> = {};
     for (const [key, member] of Object.entries(value as Record<string, unknown>)) {
       resolved[key] = walk(member, descend(ctx, key));
@@ -318,8 +329,8 @@ function dereference(reference: string, ctx: AliasContext): unknown {
  *
  * A Toghen extension: the W3C format only ever gives a `$value` that is
  * *entirely* one reference. Kept because it is genuinely useful for values with
- * no structured equivalent, and because `isReference()`/`getReferences()` have
- * always reported embedded references.
+ * no structured equivalent, and because `referencesOf()` has always reported
+ * embedded references.
  *
  * Built by concatenation rather than `String.replace()`, which matters three
  * ways: `$&`, `` $` ``, `$'` and `$1` in a resolved value stay literal; every
@@ -367,7 +378,8 @@ function interpolate(value: string, ctx: AliasContext): string {
  * Narrows a resolved value to something that can appear inside a string.
  *
  * A dimension is written back as `${value}${unit}`; a structured colour of any
- * space by `spellCssColor` (its `hex` when it has one, else CSS Color 4 syntax). Other objects and arrays are refused rather than stringified — letting them through
+ * space by `spellCssColor` (from its components: a hex when it was written as one and a hex says it exactly, else
+ * CSS Color 4 syntax). Other objects and arrays are refused rather than stringified — letting them through
  * is what produced `"[object Object]"` in generated CSS.
  *
  * @internal

@@ -83,7 +83,8 @@ export function normalizeGradient(value: GradientValue): NormalizedGradient {
     angleDeg: parseAngleToDegrees(angle),
     stops: stops.map((stop) => ({
       color: normalizeColorToSRGB01(stop.color),
-      position: stop.position,
+      // W3C §9.7: a position outside [0, 1] MUST be considered as if it were clamped to it.
+      position: Math.min(1, Math.max(0, stop.position)),
     })),
   };
 }
@@ -124,10 +125,6 @@ function validateStops(stops: unknown): asserts stops is GradientStopValue[] {
 
     if (typeof position !== 'number' || !Number.isFinite(position)) {
       throw new Error(`stop ${index} position must be a finite number.`);
-    }
-
-    if (position < 0 || position > 1) {
-      throw new Error(`stop ${index} position must be between 0 and 1.`);
     }
   });
 }

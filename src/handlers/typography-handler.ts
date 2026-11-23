@@ -3,7 +3,7 @@ import type { TokenTypeHandler } from './handler.js';
 import type { DimensionValue, LetterSpacingValue, TypographyValue } from '../types/composite-values.js';
 import { normalizeDimensionToPx, normalizeLineHeight } from '../utils/dimensions.js';
 import { computeCssNumeric } from '../utils/css-math.js';
-import { fontFamilyNames, isFontFamilyList } from '../utils/font-family.js';
+import { fontFamilyHandler } from './font-family-handler.js';
 import { dimensionHandler } from './dimension-handler.js';
 import { fontWeightHandler } from './font-weight-handler.js';
 import { letterSpacingHandler } from './letter-spacing-handler.js';
@@ -67,7 +67,7 @@ export const typographyHandler: TokenTypeHandler = {
   },
 
   /**
-   * A typography value with every member computed: `fontFamily` a list when written as one
+   * A typography value with every member computed: `fontFamily` through the font family gate
    * (`'Inter, sans-serif'` becomes `['Inter', 'sans-serif']`), `fontSize` through the length
    * gate into `{ value, unit }`, `fontWeight` a number (a W3C keyword becomes its number),
    * `lineHeight` a number, a length or a percentage string, `letterSpacing` through the letter
@@ -80,20 +80,7 @@ export const typographyHandler: TokenTypeHandler = {
       throw new Error(`Token "${path}": $value must be an object for typography tokens.`);
     }
 
-    const isName = (name: unknown) => typeof name === 'string' && name.trim() !== '';
-    const { fontFamily } = value;
-    if (Array.isArray(fontFamily)) {
-      if (fontFamily.length === 0) {
-        throw new Error(`Token "${path}": fontFamily must not be an empty array.`);
-      }
-      fontFamily.forEach((name, index) => {
-        if (!isName(name)) {
-          throw new Error(`Token "${path}": fontFamily[${index}] must be a non-empty string.`);
-        }
-      });
-    } else if (!isName(fontFamily)) {
-      throw new Error(`Token "${path}": fontFamily must be a non-empty string or an array of them.`);
-    }
+    const fontFamily = fontFamilyHandler.normalize!(value.fontFamily, path);
 
     for (const member of ['fontStyle', 'textTransform', 'textDecoration']) {
       if (value[member] !== undefined && typeof value[member] !== 'string') {
@@ -114,12 +101,7 @@ export const typographyHandler: TokenTypeHandler = {
 
     return {
       ...value,
-      fontFamily: computeMember(
-        (f) => (typeof f === 'string' && isFontFamilyList(f) ? fontFamilyNames(f) : (f as string | string[])),
-        fontFamily,
-        path,
-        'fontFamily',
-      ),
+      fontFamily,
       fontSize: computeMember(dimensionHandler.normalize!, value.fontSize, path, 'fontSize') as DimensionValue,
       fontWeight: computeMember(fontWeightHandler.normalize!, value.fontWeight, path, 'fontWeight') as number,
       lineHeight: computeMember(computeLineHeight, value.lineHeight, path, 'lineHeight'),

@@ -716,6 +716,66 @@ brace is text" (issue #129). Data files are JSON and component files KDL; both a
 
 **Rejected.** A per-context `colorScheme` under `contexts`: longer to write, and it does not say that the two contexts are a pair.
 
+## Fixed: what the review of 23 November 2026 found (23 November 2026)
+
+**Status:** built; not released yet.
+
+**Where it comes from.** The review is house's `.reference/plans/workspace/review-2026-11-23.md`, and the round's plan, `plan-2026-11-23-review-fixes.md`, is beside it. A probe proved each defect. Each fix is its own commit, with a test in the structured shapes.
+
+**Fixed:**
+
+- `color-mix()` at 0% or 100%.
+- A colour interpolated into a string, which was spelled from its `hex`.
+- Overrides beside a `$ref` in `resolutionOrder`: `resolve()` honoured them, but the other readers did not.
+- Mode names. They were matched with regard to case, though the resolver's input is matched without it.
+- Prototype keys in the token tree, the vocabulary and the merge.
+- The values `resolve()`, `DesignToken` and `contextsOf()` shared with the document.
+- A JSON Pointer `$ref` used as a value, which passed through silently.
+- `cssPropertyName`, whose names were invalid CSS.
+- A set whose sources refer to itself, which overflowed the stack.
+- Gradient stops outside 0 to 1, which were refused.
+- `fontFamily`, which had no load gate.
+- Docs that called removed APIs.
+- The resolver tests, which never used the structured shapes.
+- The factoring property test, which never asserted its count.
+
+**What the build found:**
+
+- **The ends of a mix.** culori's premultiplied interpolation returns its first colour unpremultiplied at t=0, then divides it by alpha. An end of a mix is now that colour, with no interpolation.
+- **A hex says how a colour was written, not which colour it is.**
+  - Interpolation spelled a colour by its hex. A context that replaced the components kept the base's hex, so the base's colour leaked through.
+  - The spelling now comes from the components. A hex is written only when it is exact, in lower case; any other colour is written in CSS Color 4 syntax.
+  - The merge that leaves the stale hex behind still waits for its ruling.
+- **Overrides beside a `$ref`** are applied where the modifiers are collected, so every reader sees them. Validation checks the modifier with them applied.
+- **Case.** `getModeName` now validates its input as `resolve()` does. An unknown modifier or context throws, where before it was left out in silence.
+- **Prototype keys, and the toolchain.** `Object.hasOwn` is not in the es2017 lib. Biome's `noPrototypeBuiltins` warns on `hasOwnProperty.call`. So `collection.ts` checks own keys with `Object.keys(…).includes`, over the small vocabulary only. The token tree's groups are null-prototype objects.
+- **Safe sharing, measured.** A `DesignToken` copies and freezes its `$value` and `$extensions`. A `Resolver` keeps a frozen `structuredClone` of its document, which also closes the sharing in `contextsOf()`. `resolve()` returns a copy, which its caller may change; the builds skip that copy. The cost was measured on 1,461 synthetic tokens across 36 modes:
+
+  | Approach | Cost |
+  |---|---|
+  | Freezing | 1 to 2% |
+  | A copy on every read | 8 to 16% |
+
+  An adapter that changes a token's `$value` in place now meets a `TypeError`.
+- **`cssPropertyName`** escapes as `cssLinkName` does, through one helper.
+  - A name that was already an identifier is unchanged.
+  - Two paths that give one name (`a.b` and `a-b`, `bgColor` and `bg-color`) are reported by `check()`, in `sameCssName`. They are not separated, because separating them would change every name.
+- **Gradient stops** are clamped, as W3C §9.7 says. No ruling to refuse them was on file.
+- **`fontFamily`** has a handler of its own. A stack nested in a list is spread into it, and so is a literal nested array, because one gate serves load and read.
+- **The property test.** Its skipped cells are documents whose whole design system refuses some other malformed token. Each corpus now asserts its exact counts.
+
+**Left for a ruling:**
+
+- The merge rule: a context's colour still merges key by key.
+- `transparent`'s eight-digit hex.
+
+**Noticed, not fixed:**
+
+- Prototype lookups in the `fontWeight` keyword table, the colour-space registry and `color-mix(in …)`.
+- A modifier name with `~` or `/` in a pointer, which is not unescaped.
+- `setGroupAttribute` keeps the caller's object.
+- `getNodeKind('tok.$value')` answers `'group'`.
+
 ## Open questions
 
 ### From computing values (24 October 2026)

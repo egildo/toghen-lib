@@ -2,6 +2,7 @@ import { DesignToken, InvalidTokenError, InvalidModeError, PathNotFoundError } f
 import type { LeafProperty, NonFactorable, TokenContexts } from '../resolver/chains.js';
 import { normalizeTokenValue } from '../handlers/built-in.js';
 import type { Resolver } from '../resolver/resolver.js';
+import { cssPropertyName } from '../utils/css-name.js';
 
 /**
  * Defines the structure for a group of tokens, which can contain other groups or tokens.
@@ -75,6 +76,8 @@ export interface Check {
   holes: Array<{ path: string; property: LeafProperty; holes: Array<Record<string, string>> }>;
   /** Tokens whose value one context overrides in part, so no chain can say it (a collection built from a resolver document). */
   nonFactorable: NonFactorable[];
+  /** Tokens `cssPropertyName` gives one custom-property name (`a.b` and `a-b`), each name with its paths in document order. */
+  sameCssName: Array<{ name: string; paths: string[] }>;
 }
 
 /**
@@ -179,7 +182,6 @@ class ModeValues {
  * console.log(token?.$value.hex); // '#007bff'
  *
  * // Work with modes
- * colors.setDefaultMode('dark');
  * const allPaths = colors.getAllPaths('light');
  * ```
  *
@@ -213,7 +215,7 @@ export class Collection {
 
   /**
    * The resolver that built this collection, so an adapter can put the
-   * per-modifier questions (`dependsOn`, `contextsOf`, `step`, `valueAt`) to
+   * per-modifier questions (`dependsOn`, `contextsOf`, `valueAt`) to
    * it. Set by `resolveAllToDesignSystem()` and `resolveContextsToDesignSystem()`;
    * a collection built by hand has none.
    */
@@ -256,7 +258,9 @@ export class Collection {
     this.name = name;
     this.modes = [...modes];
     this.defaultMode = modes[0];
-    this.tokens = {}; // The root of the token hierarchy
+    // The root of the token hierarchy. Every group is an object with no prototype, so a name the Object
+    // prototype holds (`constructor`, `toString`, `__proto__`) is an ordinary key, never inherited.
+    this.tokens = Object.create(null);
   }
 
   /**
@@ -372,6 +376,7 @@ export class Collection {
    * ```
    *
    * Path validation ensures that:
+   * - No path segment is empty (`a..b`, `''`)
    * - No path segment starts with '$' (reserved for metadata)
    * - No path segment contains '{', '}', or '.' characters
    *
@@ -405,6 +410,9 @@ export class Collection {
   public setToken(path: string, token: DesignToken, mode?: string): void {
     const pathParts = path.split('.');
     for (const part of pathParts) {
+      if (part === '') {
+        throw new InvalidTokenError(`Invalid token path '${path}': a segment is empty.`);
+      }
       if (part.startsWith('$') || part.includes('{') || part.includes('}') || part.includes('.')) {
         throw new InvalidTokenError(`Invalid token name: ${part}`);
       }
@@ -449,7 +457,7 @@ export class Collection {
       }
 
       if (!node) {
-        current[part] = {};
+        current[part] = Object.create(null);
       }
       current = current[part] as TokenGroup;
     }
@@ -487,13 +495,13 @@ export class Collection {
    * Retrieves a token from a specific path and mode.
    * 
    * This method navigates the hierarchical token structure to find and return
-   * the token at the specified path. For multi-mode collections, it handles
-   * mode-specific token resolution with fallback to the default mode.
+   * the token at the specified path. For multi-mode collections, it returns
+   * the token of the mode asked, and no mode falls back to another.
    * 
    * Mode resolution logic:
    * - If token has single value, return that value regardless of mode
-   * - If token has multiple values, return value for requested mode
-   * - If requested mode not found, fallback to default mode (first in array)
+   * - If token has multiple values, return value for requested mode, or null when it has none there
+   * - If the mode is not declared, throw `InvalidModeError`; omitted, it is the default mode
    * 
    * @param path - Dot-separated path to the token (e.g., "primary.blue")
    * @param mode - The desired mode (defaults to collection's default mode)
@@ -657,7 +665,7 @@ export class Collection {
         );
       }
       if (!current[part]) {
-        current[part] = {};
+        current[part] = Object.create(null);
       }
       current = current[part] as TokenGroup;
     }
@@ -687,6 +695,7 @@ export class Collection {
    * @returns The attribute's value, or null if not found
    *
    * @throws {InvalidTokenError} When attribute name doesn't start with '$'
+   * @throws {InvalidModeError} When `mode` is not one of the collection's
    *
    * @example
    * ```typescript
@@ -714,6 +723,8 @@ export class Collection {
     if (!attribute.startsWith('$')) {
       throw new InvalidTokenError(`Invalid group attribute '${attribute}'. Attributes must start with '$'.`);
     }
+    // An undeclared mode throws here as on every other read, whether or not the attribute differs between modes.
+    mode = this.modeNamed(mode);
 
     const pathParts = path === '' ? [] : path.split('.'); // the empty path is the root of the collection
 
@@ -727,7 +738,7 @@ export class Collection {
 
     // A falsy value is a value: `$deprecated: false` reads false.
     const value = current[attribute];
-    if (value instanceof ModeAttribute) return value.values.get(this.modeNamed(mode)) ?? null;
+    if (value instanceof ModeAttribute) return value.values.get(mode) ?? null;
     return value ?? null;
   }
 
@@ -764,7 +775,9 @@ export class Collection {
         );
       }
       for (const [axis, values] of Object.entries(parts as Record<string, Record<string, string>>)) {
-        vocabulary[axis] = { ...vocabulary[axis], ...values };
+        // Defined, not assigned, so an axis named `__proto__` is an axis.
+        const merged = { ...(Object.keys(vocabulary).includes(axis) ? vocabulary[axis] : {}), ...values };
+        Object.defineProperty(vocabulary, axis, { value: merged, enumerable: true, writable: true, configurable: true });
       }
     }
     return vocabulary;
@@ -874,7 +887,7 @@ export class Collection {
       if (i === 0 || (i === segments.length - 1 && !lastIsPart)) return;
       const group = segments.slice(0, i).join('.');
       const vocabulary = this.vocabularyAt(group, mode);
-      const axes = Object.keys(vocabulary).filter((axis) => key in vocabulary[axis]);
+      const axes = Object.keys(vocabulary).filter((axis) => Object.keys(vocabulary[axis]).includes(key));
       if (axes.length === 0) return;
       if (axes.length > 1) {
         throw new InvalidTokenError(
@@ -914,7 +927,10 @@ export class Collection {
     const incomplete: Check['incomplete'] = [];
     const holes: Check['holes'] = [];
     const nonFactorable: NonFactorable[] = [];
+    const byCssName = new Map<string, string[]>();
     for (const path of this.tokenPaths('', undefined)) {
+      const name = cssPropertyName(`${this.name}.${path}`);
+      byCssName.set(name, [...(byCssName.get(name) ?? []), path]);
       const missingModes = this.modes.filter((mode) => !holdsValue(this.navigate(path), mode));
       if (missingModes.length > 0) incomplete.push({ path, missingModes });
       if (!this.resolver) continue;
@@ -931,7 +947,8 @@ export class Collection {
         if (chain && chain.holes.length > 0) holes.push({ path, property: property as LeafProperty, holes: chain.holes });
       }
     }
-    return { incomplete, holes, nonFactorable };
+    const sameCssName = [...byCssName].filter(([, paths]) => paths.length > 1).map(([name, paths]) => ({ name, paths }));
+    return { incomplete, holes, nonFactorable, sameCssName };
   }
 
   /**
@@ -1033,7 +1050,8 @@ export class Collection {
   /**
    * Gets the mode used when a call omits one.
    *
-   * The first declared mode unless `setDefaultMode()` changed it. Callers that
+   * The first declared mode, or for a collection a resolver built, the combination of every modifier's declared
+   * default, wherever the build put it (`setModeContexts()` records it). Callers that
    * resolve a `'default'` sentinel must read this rather than `getModes()[0]`,
    * or the two disagree the moment the default is changed.
    *

@@ -80,14 +80,15 @@ export class CircularReferenceError extends Error {
  * - `group`      — the path names a group, not a token (W3C DTCG §7.1.1)
  * - `no-value`   — the target exists but carries no `$value`
  * - `malformed`  — the reference text is not a usable path (empty, `{a..b}`, …)
+ * - `unsupported` — the reference is a JSON Pointer `$ref` (W3C DTCG §7.1.2), not supported yet
  */
-export type UnresolvableReferenceReason = 'not-found' | 'group' | 'no-value' | 'malformed';
+export type UnresolvableReferenceReason = 'not-found' | 'group' | 'no-value' | 'malformed' | 'unsupported';
 
 /**
  * Structured details attached to an {@link UnresolvableReferenceError}.
  */
 export interface UnresolvableReferenceDetails {
-  /** The reference exactly as written, braces included — e.g. `'{color.blue}'`. */
+  /** The reference exactly as written, braces included — e.g. `'{color.blue}'`; for a `$ref`, its pointer. */
   reference: string;
   /** Collection-relative path of the token that contained the reference. */
   tokenPath: string;
@@ -153,7 +154,7 @@ export class UnresolvableReferenceError extends PathNotFoundError {
  * spliced into the surrounding string.
  *
  * Only reachable through partial-string interpolation — a Toghen extension
- * beyond the W3C format (see {@link DesignToken.isReference}). Interpolating an
+ * beyond the W3C format (see specs.md, "Partial-string interpolation"). Interpolating an
  * object or array would silently produce `"[object Object]"`, so it is refused.
  *
  * @example
@@ -236,8 +237,9 @@ export class DesignToken {
   /**
    * Creates a new immutable DesignToken instance.
    *
-   * All values are deep cloned to ensure immutability, except for DesignToken instances
-   * which are preserved as-is since they are already immutable.
+   * `$value` and `$extensions` are deep cloned and frozen, except for DesignToken instances
+   * which are preserved as-is since they are already immutable: the token shares nothing
+   * with what it was made from, and nothing it gives out can change it.
    *
    * @param $value - The token's value (primitive, object, array, or reference string)
    * @param $type - The semantic type of the token
@@ -262,21 +264,22 @@ export class DesignToken {
    * ```
    */
   constructor($value: any, $type: string, $description = '', $extensions: Record<string, any> | null = null) {
-    this.$value = this.deepClone($value); // Deep clone for immutability
+    this.$value = this.deepClone($value);
     this.$type = $type;
     this.$description = $description;
-    this.$extensions = $extensions;
+    this.$extensions = $extensions === null ? null : this.deepClone($extensions);
   }
 
   /**
-   * Deep clones a value while preserving DesignToken instances for immutability.
+   * Deep clones and freezes a value while preserving DesignToken instances for immutability.
    *
    * This method recursively clones objects and arrays to ensure that modifications
-   * to the original value don't affect the token's stored value. DesignToken instances
-   * are preserved as-is since they are already immutable.
+   * to the original value don't affect the token's stored value, and freezes each
+   * clone so the value the token gives out cannot be changed in place. DesignToken
+   * instances are preserved as-is since they are already immutable.
    *
    * @param value - The value to clone (can be any type)
-   * @returns A deep clone of the value with DesignToken instances preserved
+   * @returns A frozen deep clone of the value with DesignToken instances preserved
    *
    * @private
    */
@@ -290,7 +293,7 @@ export class DesignToken {
     }
 
     if (Array.isArray(value)) {
-      return value.map((item) => this.deepClone(item));
+      return Object.freeze(value.map((item) => this.deepClone(item)));
     }
 
     const cloned: any = {};
@@ -299,6 +302,6 @@ export class DesignToken {
         cloned[key] = this.deepClone(value[key]);
       }
     }
-    return cloned;
+    return Object.freeze(cloned);
   }
 }

@@ -19,12 +19,18 @@ export function cssIdentifier(name: string): string {
   );
 }
 
+/** A name with each character an identifier cannot hold escaped: all but letters, digits, `_`, `-` and non-ASCII. */
+const escapeIdentifier = (name: string): string => name.replace(/[^\w\u0080-\uffff-]/g, (c) => `\\${c}`);
+
 /**
  * A token's CSS custom-property name: `ds.surface.accent` → `--surface-accent`.
  *
  * The token path without the collection segment, each segment spelled by
  * {@link cssIdentifier} and joined by `-`: `ds.button.backgroundColor` is
- * `--button-background-color`.
+ * `--button-background-color`. What an identifier cannot hold is escaped, as
+ * {@link cssLinkName} escapes it: `ds.size.1/2` is `--size-1\/2`. A name that is
+ * already an identifier is unchanged. Two paths can still give one name
+ * (`a.b` and `a-b`); `Collection.check()` reports them.
  *
  * It lives in the core because two adapters must agree on it: the CSS adapter
  * declares and references the property, and the Figma adapter writes the same
@@ -34,7 +40,7 @@ export function cssIdentifier(name: string): string {
  * @returns The property name, `--` included
  */
 export function cssPropertyName(lookupPath: string): string {
-  return `--${lookupPath.split('.').slice(1).map(cssIdentifier).join('-')}`;
+  return `--${escapeIdentifier(lookupPath.split('.').slice(1).map(cssIdentifier).join('-'))}`;
 }
 
 /**
@@ -49,5 +55,5 @@ export function cssPropertyName(lookupPath: string): string {
  * @param modifier - The link's modifier, as the document names it (or a folded axis, as the vocabulary names it)
  */
 export function cssLinkName(head: string, modifier: string): string {
-  return `${head}--${modifier.replace(/\s+/g, '-').replace(/[^\w\u0080-\uffff-]/g, (c) => `\\${c}`)}`;
+  return `${head}--${escapeIdentifier(modifier.replace(/\s+/g, '-'))}`;
 }

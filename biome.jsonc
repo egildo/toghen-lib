@@ -35,11 +35,6 @@
       "includes": ["src/utils/css-math.ts"],
       "linter": { "rules": { "complexity": { "noCommaOperator": "off" } } }
     },
-    // noShadowRestrictedNames: the script's local `escape` (regex escaper) shadows the legacy global on purpose; it is a standalone script.
-    {
-      "includes": ["scripts/check-purity.mjs"],
-      "linter": { "rules": { "suspicious": { "noShadowRestrictedNames": "off" } } }
-    },
     // noAssignInExpressions: regex-scanner loop condition, memoised cache fill and cached-index return are written as assignments on purpose.
     {
       "includes": ["src/core/alias.ts", "src/resolver/chains.ts", "src/resolver/resolver.ts"],

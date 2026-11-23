@@ -170,7 +170,7 @@ describe('Resolver — resolveAllToDesignSystem', () => {
     const ds = new Resolver(themedDocument()).resolveAllToDesignSystem();
     const collection = ds.getCollection('themed');
 
-    assert.deepEqual(collection?.check(), { incomplete: [], holes: [], nonFactorable: [] });
+    assert.deepEqual(collection?.check(), { incomplete: [], holes: [], nonFactorable: [], sameCssName: [] });
     assert.deepEqual(collection?.getAllPaths('light'), collection?.getAllPaths('dark'));
   });
 

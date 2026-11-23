@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { gradientHandler } from '../../../src/handlers/gradient-handler.js';
 import { DesignToken } from '../../../src/core/design-token.js';
+import { normalizeGradient } from '../../../src/utils/normalize-gradient.js';
 
 test('Gradient Handler Unit Tests', async (t) => {
   await t.test('Validation', async (t) => {
@@ -21,16 +22,29 @@ test('Gradient Handler Unit Tests', async (t) => {
       assert.doesNotThrow(() => gradientHandler.validate?.(token, 'background.hero.gradient'));
     });
 
-    await t.test('should throw when stop position is outside [0,1]', () => {
-      const token = new DesignToken(
-        {
-          type: 'linear',
-          stops: [{ color: '#ff0000', position: 1.2 }],
-        },
-        'gradient',
-      );
+    await t.test('clamps a stop position outside [0, 1] into it, as W3C §9.7 says', () => {
+      const red = { colorSpace: 'srgb', components: [1, 0, 0] };
+      const blue = { colorSpace: 'srgb', components: [0, 0, 1] };
+      const stops = [
+        { color: red, position: -99 },
+        { color: blue, position: 42 },
+      ];
 
-      assert.throws(() => gradientHandler.validate?.(token, 'background.invalid.gradient'), /position must be between 0 and 1/);
+      assert.deepEqual(
+        (gradientHandler.normalize!(stops, 'background.hero') as Array<{ position: number }>).map((stop) => stop.position),
+        [0, 1],
+      );
+      assert.deepEqual(
+        (gradientHandler.normalize!({ type: 'linear', stops }, 'background.hero') as { stops: Array<{ position: number }> }).stops.map(
+          (stop) => stop.position,
+        ),
+        [0, 1],
+      );
+      assert.deepEqual(
+        normalizeGradient(stops).stops.map((stop) => stop.position),
+        [0, 1],
+      );
+      assert.throws(() => gradientHandler.normalize!([{ color: red, position: Number.NaN }], 'g'), /position must be a finite number/);
     });
   });
 

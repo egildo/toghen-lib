@@ -16,6 +16,26 @@ test('cssPropertyName', async (t) => {
     assert.strictEqual(cssPropertyName('ds.button.backgroundColor'), '--button-background-color');
     assert.strictEqual(cssPropertyName('ds.Colors.Primary'), '--colors-primary');
   });
+
+  await t.test('escapes what an identifier cannot hold, as cssLinkName does', () => {
+    assert.strictEqual(cssPropertyName('ds.size.1/2'), '--size-1\\/2');
+    assert.strictEqual(cssPropertyName('ds.opacity.50%'), '--opacity-50\\%');
+    assert.strictEqual(cssPropertyName('ds.w.a(b):c'), '--w-a\\(b\\)\\:c');
+    assert.strictEqual(cssPropertyName('ds.path.a\\b'), '--path-a\\\\b');
+  });
+
+  await t.test('leaves a name that is already an identifier as it was', () => {
+    for (const [path, name] of [
+      ['ds.space.2xl', '--space-2xl'],
+      ['ds.space.1x', '--space-1x'],
+      ['ds.space.1.5', '--space-1-5'],
+      ['ds.under_score', '--under_score'],
+      ['ds.couleur.café', '--couleur-café'],
+      ['ds.-webkitLineClamp', '---webkit-line-clamp'],
+    ]) {
+      assert.strictEqual(cssPropertyName(path), name);
+    }
+  });
 });
 
 test('cssIdentifier', async (t) => {

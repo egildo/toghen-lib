@@ -209,9 +209,14 @@ export function mixColors(
     if (to[channel] === undefined) to[channel] = from[channel];
   }
 
-  const mixed = interpolateWithPremultipliedAlpha([from as unknown as Color, to as unknown as Color], mode, {
-    h: { fixup: HUE_FIXUPS[hueMethod] },
-  } as never)(p2 / sum) as unknown as Channels;
+  // An end of the mix is that colour. culori returns its first colour as given at 0 and then
+  // divides it by alpha as if premultiplied, and a round trip at 1 adds float noise.
+  const t = p2 / sum;
+  const interpolate = () =>
+    interpolateWithPremultipliedAlpha([from as unknown as Color, to as unknown as Color], mode, {
+      h: { fixup: HUE_FIXUPS[hueMethod] },
+    } as never)(t) as unknown as Channels;
+  const mixed = t === 0 ? from : t === 1 ? to : interpolate();
 
   for (const channel of missingInBoth) mixed[channel] = undefined;
   if (sum < 100) mixed.alpha = (mixed.alpha ?? 1) * (sum / 100);
@@ -279,22 +284,21 @@ export function toCuloriColor(value: ColorValue): Color {
 }
 
 /**
- * A structured colour spelled inside a string: its `hex` when it carries one
- * (the alpha byte appended only to a six-digit hex, so `transparent`'s
- * `#00000000` stays eight digits), otherwise CSS Color 4 syntax in its own
- * space. `parseCssColor(spellCssColor(c))` gives `c` back, within float tolerance.
+ * A structured colour spelled inside a string, from its space, components and alpha. W3C makes `hex` a fallback,
+ * so its digits are never read: that it is there says the colour was written as a hex. Such an sRGB colour whose
+ * channels and alpha are whole bytes is spelled as the hex they give, the alpha byte appended when the alpha is
+ * below 1 (`transparent` is `#00000000`); any other colour in CSS Color 4 syntax in its own space.
+ * `parseCssColor(spellCssColor(c))` gives `c` back, within float tolerance.
  */
 export function spellCssColor(value: ColorValue): string {
   const alpha = value.alpha ?? 1;
-  if (value.hex && /^#[0-9a-f]{6}$/i.test(value.hex)) {
-    return alpha < 1
-      ? value.hex +
-          Math.round(alpha * 255)
-            .toString(16)
-            .padStart(2, '0')
-      : value.hex;
+  const bytes =
+    value.colorSpace === 'srgb' && value.hex !== undefined
+      ? [...value.components, ...(alpha < 1 ? [alpha] : [])].map((c) => (typeof c === 'number' ? c * 255 : Number.NaN))
+      : [];
+  if (bytes.length > 0 && bytes.every((b) => b > -EPSILON && b < 255 + EPSILON && Math.abs(b - Math.round(b)) < EPSILON)) {
+    return `#${bytes.map((b) => Math.round(b).toString(16).padStart(2, '0')).join('')}`;
   }
-  if (value.hex && /^#[0-9a-f]{8}$/i.test(value.hex)) return value.hex;
   return formatCss(toCuloriColor(value));
 }
 

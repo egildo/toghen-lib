@@ -27,11 +27,11 @@ asks them, one command each.
 | **paths** | What lies under a group, each marked token or group; what a group declares; the lookup path of a reference path and back | `Collection.childrenOf`, `getAllPaths`, `getNodeKind`, `getGroupAttribute`, `DesignSystem.lookupPath`, `referencePath` |
 | **value** | A token's value, or a member's, in a mode; across the modes; what each context says and which definition applies; the value under contexts no build made | `DesignSystem.resolveValue`, `Resolver.contextsOf`, `Resolver.valueAt`, `normalizeTokenValue` and the normalized forms |
 | **type** | A token's type, its own, through a reference, or its group's, in a mode | `DesignSystem.resolveToken` |
-| **refs** | What a token or a raw value refers to, member by member; which modifiers a token depends on, directly and through references | `DesignSystem.referencesOf`, `referencesIn`, `holdsReference`, `referenceTarget`, `parseReferencePath`, `Resolver.dependsOn` |
+| **refs** | What a token or a raw value refers to, member by member, and a raw string's text with its escapes removed; which modifiers a token depends on, directly and through references | `DesignSystem.referencesOf`, `referencesIn`, `holdsReference`, `referenceTarget`, `parseReferencePath`, `literalText`, `Resolver.dependsOn` |
 | **parts** | The parts a path passes through, its component, its twins and rest; the part a group is; the vocabulary in force; a component's axes in precedence order | `Collection.partsOf`, `partAt`, `vocabularyAt`, `axesOf` |
 | **applies** | Under a selection of part values, which token supplies each key of a component | `Collection.applies` |
-| **check** | The holes, the non-factorable tokens and the tokens incomplete in some mode, in one call; two sources of one set or context giving one token a value | `Collection.check`, `load` (its collisions) |
-| **css** | The names two adapters share: a token's custom property, a chain link's, a context's spelling | `cssPropertyName`, `cssIdentifier`, `cssLinkName`, `getContextSelector` |
+| **check** | The holes, the non-factorable tokens, the tokens incomplete in some mode and the tokens with one CSS name, in one call; two sources of one set or context giving one token a value | `Collection.check`, `load` (its collisions) |
+| **css** | The names two adapters share: a token's custom property, a chain link's, a context's spelling, the two contexts a `light-dark()` modifier pairs | `cssPropertyName`, `cssIdentifier`, `cssLinkName`, `getContextSelector`, `getLightDark` |
 
 A consumer that needs something else asks for it to be added here, once a second consumer asks it too; until then
 it is the consumer's own business. The rules each answer follows:
@@ -71,7 +71,7 @@ The guiding principle is minimalism, powerful yet unobtrusive:
 `DesignToken` instances are immutable. A change is a new instance. This provides:
 
 - **Predictable state**: no side effects, easy data-flow tracing.
-- **Safe sharing**: tokens can be passed freely without fear of mutation.
+- **Safe sharing**: tokens can be passed freely without fear of mutation. A token's `$value` and `$extensions` are copied when it is made and frozen. A `Resolver` keeps a frozen copy of its document, so what it gives out (a chain's values, a group's attributes) cannot change it, and the caller's document is never changed through it; `resolve()` returns a copy the caller may change. Freezing costs one pass when a value is made and nothing when it is read, where a copy on every read costs on every read. Measured on a document of 1,461 tokens and four modifiers of 2, 2, 3 and 3 contexts: the product build about 1% slower frozen and 16% slower copied on read, reading every token in every mode of the sum build 2% and 8%. The resolver's copy costs about 1.7 ms once, and `resolve()`'s about 1.2 ms a call; the builds do not make the second.
 - **Change detection**: trivial to diff for UI framework integration.
 
 #### Handler Pattern for Extensibility
@@ -243,6 +243,7 @@ The W3C format requires tools to report unresolvable and circular references
 | Path names a group, not a token (§7.1.1) | `UnresolvableReferenceError` | `group` |
 | Target carries no `$value` | `UnresolvableReferenceError` | `no-value` |
 | Path shape can never name a token (`{a..b}`, `{$x}`) | `UnresolvableReferenceError` | `malformed` |
+| A JSON Pointer `$ref` as a value or a member (§7.1.2), not supported yet | `UnresolvableReferenceError` | `unsupported` |
 | Reference chain loops | `CircularReferenceError` | — |
 | Non-scalar interpolated into a string | `InvalidInterpolationError` | — |
 
@@ -263,7 +264,7 @@ spliced into the surrounding text. The W3C format has no equivalent: there, a
 
 Limits, enforced rather than implied:
 
-- The target must resolve to a **scalar**. An object or array throws `InvalidInterpolationError` instead of stringifying to `[object Object]`. The library lets two objects through, as the string they could have been written as: a dimension (`'24px'`) and a structured colour of any space. A colour is spelled by its `hex` when it carries one, the alpha byte appended only to a six-digit hex, and otherwise in CSS Color 4 syntax in its own space (`oklch(0.7 0.1 200)`). Lib's colour reader reads every such spelling back, so a colour interpolated into a `color-mix()` string computes. Colours and dimension strings are stored structured (see *Token values* below), and without this a value that interpolated when written as a string would stop interpolating once it was stored.
+- The target must resolve to a **scalar**. An object or array throws `InvalidInterpolationError` instead of stringifying to `[object Object]`. The library lets two objects through, as the string they could have been written as: a dimension (`'24px'`) and a structured colour of any space. A colour is spelled from its space, components and alpha, never from its `hex`, which W3C makes a fallback: an sRGB colour that carries a `hex`, and whose channels and alpha are whole bytes, as the hex those give, the alpha byte appended when the alpha is below 1; any other in CSS Color 4 syntax in its own space (`oklch(0.7 0.1 200)`, `color(srgb 0 0 0 / 0.5)`). Lib's colour reader reads every such spelling back, so a colour interpolated into a `color-mix()` string computes. Colours and dimension strings are stored structured (see *Token values* below), and without this a value that interpolated when written as a string would stop interpolating once it was stored.
 - A target whose own value holds a reference is inserted as its resolved string, not its computed value: with `mix` written `color-mix(in srgb, {ink} 5%, transparent)`, `'x {mix}'` resolves to `'x color-mix(in srgb, #112233 5%, transparent)'`.
 - A doubled brace is a literal brace, removed from the resolved string (see [The grammar is public](#the-grammar-is-public)).
 - `$&`, `` $` ``, `$'` and `$1` in a resolved value stay literal.
@@ -388,7 +389,7 @@ The Resolver handles multi-mode and multi-theme workflows. It reads a `.resolver
 | `modifiers` | — | Named conditional layers; each context key is a list of sources |
 | `$defs` | — | Silently ignored (pass-through, per spec MUST) |
 
-Items in `resolutionOrder` are either JSON Pointer `$ref`s (`#/sets/<name>`, `#/modifiers/<name>`) or inline `{ name, type, sources/contexts }` objects. `Resolver` follows same-document pointers only; file references are inlined first by `load`, below. Pointers follow RFC 6901 (`~1` → `/`, `~0` → `~`).
+Items in `resolutionOrder` are either JSON Pointer `$ref`s (`#/sets/<name>`, `#/modifiers/<name>`) or inline `{ name, type, sources/contexts }` objects. `Resolver` follows same-document pointers only; file references are inlined first by `load`, below. Pointers follow RFC 6901 (`~1` → `/`, `~0` → `~`). A set whose sources refer back to it, directly or through other sets, is an `InvalidReferenceError` that gives the cycle, as `load` gives it: §4.2 forbids a circular reference object. Keys beside a `$ref` are overrides, as §4.2 requires, applied shallowly; a modifier's are applied wherever the modifier is read, so a `default` given beside its `$ref` is its default in mode names, `getModifiers()`, the builds and the chains as well as in `resolve()`.
 
 ### External sources: where the graph becomes one thing
 
@@ -708,12 +709,11 @@ The rulings on the errors of `valueAt`, the open names and the document-wide che
 
 ## Token values
 
-**A token's value is checked however it enters.** Every path into a system (`DesignSystem.setToken()`, `Collection.setToken()`, a resolver document) ends in `Collection.setToken()`, and the check runs there.
+**A token's value is checked however it enters.** Every path into a system (`Collection.setToken()`, a resolver document, `load`) ends in `Collection.setToken()`, and the check runs there.
 
-**The W3C types are lib's, not the caller's.** `color`, `dimension`, `fontWeight`,
-`border`, `shadow`, `typography` and `gradient` are checked whether or not a handler is registered
-for them: their shape is a fact about the format, not a choice a system makes.
-A registered handler adds methods, and may add its own `validate()`.
+**The W3C types are lib's, not the caller's.** `color`, `dimension`, `fontFamily`, `fontWeight`,
+`border`, `shadow`, `typography` and `gradient` are checked by lib's own handlers, which a system cannot replace:
+their shape is a fact about the format, not a choice a system makes.
 
 **Lib stores the computed value.** CSS Values separates three values: the *specified* value, what the author
 wrote; the *computed* value, reduced as far as it can be without an element; and the *used* value, which needs the
@@ -763,7 +763,7 @@ The rule is one exported function, `fontFamilyNames(value): string[]`. A string 
 
 It is applied in two places:
 
-- **On load**, a `fontFamily` token's string with a comma outside quotes is converted to the array, as other string forms are (see above), and so is a typography member's. A string with none stays a string, the format's own single-family form.
+- **On load**, a `fontFamily` token's string with a comma outside quotes is converted to the array, as other string forms are (see above), and so is a typography member's. A string with none stays a string, the format's own single-family form. The value is checked there too, by the font family handler: a non-empty name, or a non-empty list of non-empty names. A reference to a stack written as an entry of a list (`['{font.base}', 'serif']`) is spread into the list when it resolves, since the format's family is a list of names and never a list of lists.
 - **On read**, by every adapter: the PostCSS plugin's font-family spelling and the Figma adapter's `toFigmaFontFamily` take the names from `fontFamilyNames()`. That covers what load cannot see: a family reached through an untyped token by reference.
 
 A quoted part keeps a comma inside it (`"'Foo, Bar', serif"` is two names, `Foo, Bar` and `serif`), since the quotes say where the name ends.
@@ -829,7 +829,7 @@ A dimension token stays `px` or `rem`: a spacing in `em` has no meaning in Figma
 
 **A letter spacing is a token type of its own.** A design system may keep its tracking as a ramp (`track.tight`, `track.wide`) that is nothing but letter spacings. Untyped, the ramp is stored as written, checked by nothing, skipped by Figma, and a component token that references it is a type conflict. Typed `dimension`, it cannot hold `em`; and it cannot become typography tokens, which need a family and a size. So the lib has a type, `letterSpacing`, for a token that is only ever a letter spacing.
 
-- **The type is a Toghen extension, not a W3C one.** The format has no letter spacing type. Tokens Studio, a tool that reads the same format, has one of this name. Like the W3C types it is checked on load whether or not a handler is registered, since its shape is a fact about the type.
+- **The type is a Toghen extension, not a W3C one.** The format has no letter spacing type. Tokens Studio, a tool that reads the same format, has one of this name. Like the W3C types it is checked on load by lib's own handler, since its shape is a fact about the type.
 - **Its value** is a length: `{ value, unit }` with `unit` one of `px`, `rem` or `em`, or the string form (`'-0.021em'`), converted to the structured form as other strings are. `pt` and `mm` are refused: no one tracks text in them, and a smaller set is easier to state. A bare number is refused.
 - **Where it is used.** A typography token's `letterSpacing` member may reference a `letterSpacing` token, as it may reference a `dimension` token. A `letterSpacing` token is not a dimension and does not pass as one: a place that wants a dimension meets a type conflict, which is the point of the type. The lib adds no walk over references to check where a letter spacing ends up.
 - **The member keeps its rule.** The `em` in a typography `letterSpacing` member, written inline, stays as set out above. The member goes through the type's gate, so a member in `pt` or `mm` is refused too.
@@ -859,6 +859,7 @@ runs.
 - **Dimension**: a string (`'16px'`, `'calc(1rem + 2px)'`) is computed by the numeric grammar (`src/utils/css-math.ts`) into `{ value, unit }`; a structured dimension is checked.
 - **Letter spacing**: the same, with units `px`, `rem` and `em`: `'-0.021em'` becomes `{ value: -0.021, unit: 'em' }`.
 - **Font weight**: a W3C keyword becomes its number; a number or a numeric string is checked from 1 to 1000.
+- **Font family**: a string with a comma outside quotes becomes a list; a name, a list and every name in it must not be empty; a stack inside a list is spread into it.
 - **Typography, shadow, gradient, border**: every member goes through its family's gate and is stored computed. An error names the member (`color`, `0.blur`, `stops.1.color`).
 
 The colour reader and the numeric grammar are the two families. Each has one parser, and both gates call it, so a
@@ -973,6 +974,12 @@ adapters call it, so the CSS adapter's link and the Figma code syntax agree; bef
 Paths already in lowercase and hyphens, the common case, keep their names.
 Whitespace still becomes `-`.
 
+**A property name is an identifier.** `cssPropertyName()` escapes, with a backslash, what an identifier cannot
+hold, as `cssLinkName()` does: `ds.size.1/2` is `--size-1\/2` and `ds.opacity.50%` is `--opacity-50\%`, where they
+were invalid CSS before. A name that is already an identifier is unchanged. The rule still maps two paths to one
+name, `a.b` and `a-b`, `bgColor` and `bg-color`; rather than change every name to keep them apart,
+`Collection.check()` reports them, in `sameCssName`, and the author renames one.
+
 **Open: a configurable rule.** `@toghen/postcss` takes a `propertyName`
 function, and a function cannot reach the Figma plugin, which reads documents.
 A consumer who customises it gets CSS and code syntax that disagree. When a
@@ -1031,5 +1038,5 @@ Completed items are in [decisions.md](./decisions.md#completed).
 
 ### Future
 - [ ] Dangling references in the document-wide check, which lists holes, non-factorable tokens and incomplete tokens today
-- [ ] JSON Pointer `$ref` references (§7.1.2) and `$extends` (§6.4)
+- [ ] JSON Pointer `$ref` references (§7.1.2) and `$extends` (§6.4). Until then a `$ref` in a `$value` is stored as written and refused when it is read, with `UnresolvableReferenceError` and the reason `unsupported`.
 - [ ] Schema versioning / migration utilities

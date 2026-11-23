@@ -19,6 +19,11 @@ import assert from 'node:assert/strict';
 import { Resolver } from '../../src/resolver/resolver.js';
 import type { ResolverDocument } from '../../src/resolver/types.js';
 
+// The W3C structured shapes, as the format writes them: a colour as { colorSpace, components }, a dimension as
+// { value, unit }. Plain strings alone once hid a serialisation bug.
+const srgb = (r: number, g: number, b: number) => ({ colorSpace: 'srgb', components: [r, g, b] });
+const px = (value: number) => ({ value, unit: 'px' });
+
 // ---------------------------------------------------------------------------
 // Test 1 — plain set → DesignSystem
 // ---------------------------------------------------------------------------
@@ -32,13 +37,13 @@ test('Resolver integration: plain set resolves into DesignSystem', () => {
         sources: [
           {
             colors: {
-              primary: { $value: '#0000ff', $type: 'color' },
-              white: { $value: '#ffffff', $type: 'color' },
+              primary: { $value: srgb(0, 0, 1), $type: 'color' },
+              white: { $value: srgb(1, 1, 1), $type: 'color' },
             },
             spacing: {
-              sm: { $value: '4px', $type: 'dimension' },
-              md: { $value: '8px', $type: 'dimension' },
-              lg: { $value: '16px', $type: 'dimension' },
+              sm: { $value: px(4), $type: 'dimension' },
+              md: { $value: px(8), $type: 'dimension' },
+              lg: { $value: px(16), $type: 'dimension' },
             },
           },
         ],
@@ -57,7 +62,7 @@ test('Resolver integration: plain set resolves into DesignSystem', () => {
   // Tokens should be accessible
   const primary = ds.resolveToken('foundation.colors.primary');
   assert.ok(primary, 'primary token should resolve');
-  assert.equal(primary.$value.hex, '#0000ff');
+  assert.deepEqual(primary.$value, srgb(0, 0, 1));
   assert.equal(primary.$type, 'color');
 
   const spacingMd = ds.resolveToken('foundation.spacing.md');
@@ -77,7 +82,7 @@ test('Resolver integration: light/dark theme modifier', () => {
         sources: [
           {
             colors: {
-              brand: { $value: '#0057ff', $type: 'color' },
+              brand: { $value: srgb(0, 0.341, 1), $type: 'color' },
             },
           },
         ],
@@ -89,16 +94,16 @@ test('Resolver integration: light/dark theme modifier', () => {
           light: [
             {
               colors: {
-                background: { $value: '#ffffff', $type: 'color' },
-                text: { $value: '#000000', $type: 'color' },
+                background: { $value: srgb(1, 1, 1), $type: 'color' },
+                text: { $value: srgb(0, 0, 0), $type: 'color' },
               },
             },
           ],
           dark: [
             {
               colors: {
-                background: { $value: '#1a1a1a', $type: 'color' },
-                text: { $value: '#f5f5f5', $type: 'color' },
+                background: { $value: srgb(0.102, 0.102, 0.102), $type: 'color' },
+                text: { $value: srgb(0.961, 0.961, 0.961), $type: 'color' },
               },
             },
           ],
@@ -115,26 +120,26 @@ test('Resolver integration: light/dark theme modifier', () => {
   const dsLight = resolver.resolveToDesignSystem({ theme: 'light' });
   const bgLight = dsLight.resolveToken('resolved.colors.background');
   assert.ok(bgLight);
-  assert.equal(bgLight.$value.hex, '#ffffff');
+  assert.deepEqual(bgLight.$value, srgb(1, 1, 1));
 
   const brandLight = dsLight.resolveToken('resolved.colors.brand');
   assert.ok(brandLight, 'brand (from base set) should still be present in light mode');
-  assert.equal(brandLight.$value.hex, '#0057ff');
+  assert.deepEqual(brandLight.$value, srgb(0, 0.341, 1));
 
   // --- dark mode ---
   const dsDark = resolver.resolveToDesignSystem({ theme: 'dark' });
   const bgDark = dsDark.resolveToken('resolved.colors.background');
   assert.ok(bgDark);
-  assert.equal(bgDark.$value.hex, '#1a1a1a');
+  assert.deepEqual(bgDark.$value, srgb(0.102, 0.102, 0.102));
 
   const textDark = dsDark.resolveToken('resolved.colors.text');
   assert.ok(textDark);
-  assert.equal(textDark.$value.hex, '#f5f5f5');
+  assert.deepEqual(textDark.$value, srgb(0.961, 0.961, 0.961));
 
   // --- default (no input → uses 'light' default) ---
   const dsDefault = resolver.resolveToDesignSystem();
   const bgDefault = dsDefault.resolveToken('resolved.colors.background');
-  assert.equal(bgDefault?.$value.hex, '#ffffff');
+  assert.deepEqual(bgDefault?.$value, srgb(1, 1, 1));
 });
 
 // ---------------------------------------------------------------------------
@@ -147,15 +152,15 @@ test('Resolver integration: orthogonal theme × size modifiers', () => {
     modifiers: {
       theme: {
         contexts: {
-          light: [{ colors: { bg: { $value: '#fff', $type: 'color' } } }],
-          dark: [{ colors: { bg: { $value: '#000', $type: 'color' } } }],
+          light: [{ colors: { bg: { $value: srgb(1, 1, 1), $type: 'color' } } }],
+          dark: [{ colors: { bg: { $value: srgb(0, 0, 0), $type: 'color' } } }],
         },
         default: 'light',
       },
       size: {
         contexts: {
-          compact: [{ spacing: { base: { $value: '4px', $type: 'dimension' } } }],
-          spacious: [{ spacing: { base: { $value: '16px', $type: 'dimension' } } }],
+          compact: [{ spacing: { base: { $value: px(4), $type: 'dimension' } } }],
+          spacious: [{ spacing: { base: { $value: px(16), $type: 'dimension' } } }],
         },
         default: 'compact',
       },
@@ -166,11 +171,11 @@ test('Resolver integration: orthogonal theme × size modifiers', () => {
   const resolver = new Resolver(doc);
 
   // All four permutations
-  const permutations: Array<[string, string, string, number]> = [
-    ['light', 'compact', '#ffffff', 4],
-    ['light', 'spacious', '#ffffff', 16],
-    ['dark', 'compact', '#000000', 4],
-    ['dark', 'spacious', '#000000', 16],
+  const permutations: Array<[string, string, ReturnType<typeof srgb>, number]> = [
+    ['light', 'compact', srgb(1, 1, 1), 4],
+    ['light', 'spacious', srgb(1, 1, 1), 16],
+    ['dark', 'compact', srgb(0, 0, 0), 4],
+    ['dark', 'spacious', srgb(0, 0, 0), 16],
   ];
 
   for (const [theme, size, expectedBg, expectedSpacing] of permutations) {
@@ -178,7 +183,7 @@ test('Resolver integration: orthogonal theme × size modifiers', () => {
     const bg = ds.resolveToken('resolved.colors.bg');
     const spacing = ds.resolveToken('resolved.spacing.base');
 
-    assert.equal(bg?.$value.hex, expectedBg, `theme=${theme}, size=${size}: bg should be ${expectedBg}`);
+    assert.deepEqual(bg?.$value, expectedBg, `theme=${theme}, size=${size}: bg should be ${JSON.stringify(expectedBg)}`);
     assert.deepEqual(
       spacing?.$value,
       { value: expectedSpacing, unit: 'px' },
@@ -199,7 +204,7 @@ test('Resolver integration: aliases are resolved in DesignSystem', () => {
         sources: [
           {
             colors: {
-              blue500: { $value: '#0057ff', $type: 'color' },
+              blue500: { $value: srgb(0, 0.341, 1), $type: 'color' },
               // 'cta' references 'blue500' — must be resolved by DesignSystem.
               // The path is document-relative: it carries no collection name,
               // so it keeps working whatever the collection ends up called.
@@ -223,7 +228,7 @@ test('Resolver integration: aliases are resolved in DesignSystem', () => {
   // resolveToken() follows the alias through DesignSystem
   const resolvedCta = ds.resolveToken('resolved.colors.cta');
   assert.ok(resolvedCta, 'resolved CTA token should not be null');
-  assert.equal(resolvedCta.$value.hex, '#0057ff', 'alias should resolve to blue500 value');
+  assert.deepEqual(resolvedCta.$value, srgb(0, 0.341, 1), 'alias should resolve to blue500 value');
 });
 
 // ---------------------------------------------------------------------------
@@ -238,8 +243,8 @@ test('Resolver integration: modifier context sources that $ref named sets', () =
         sources: [
           {
             colors: {
-              bg: { $value: '#ffffff', $type: 'color' },
-              text: { $value: '#000000', $type: 'color' },
+              bg: { $value: srgb(1, 1, 1), $type: 'color' },
+              text: { $value: srgb(0, 0, 0), $type: 'color' },
             },
           },
         ],
@@ -248,8 +253,8 @@ test('Resolver integration: modifier context sources that $ref named sets', () =
         sources: [
           {
             colors: {
-              bg: { $value: '#1a1a1a', $type: 'color' },
-              text: { $value: '#f0f0f0', $type: 'color' },
+              bg: { $value: srgb(0.102, 0.102, 0.102), $type: 'color' },
+              text: { $value: srgb(0.941, 0.941, 0.941), $type: 'color' },
             },
           },
         ],
@@ -270,12 +275,12 @@ test('Resolver integration: modifier context sources that $ref named sets', () =
   const resolver = new Resolver(doc);
 
   const dsLight = resolver.resolveToDesignSystem({ theme: 'light' });
-  assert.equal(dsLight.resolveToken('resolved.colors.bg')?.$value.hex, '#ffffff');
-  assert.equal(dsLight.resolveToken('resolved.colors.text')?.$value.hex, '#000000');
+  assert.deepEqual(dsLight.resolveToken('resolved.colors.bg')?.$value, srgb(1, 1, 1));
+  assert.deepEqual(dsLight.resolveToken('resolved.colors.text')?.$value, srgb(0, 0, 0));
 
   const dsDark = resolver.resolveToDesignSystem({ theme: 'dark' });
-  assert.equal(dsDark.resolveToken('resolved.colors.bg')?.$value.hex, '#1a1a1a');
-  assert.equal(dsDark.resolveToken('resolved.colors.text')?.$value.hex, '#f0f0f0');
+  assert.deepEqual(dsDark.resolveToken('resolved.colors.bg')?.$value, srgb(0.102, 0.102, 0.102));
+  assert.deepEqual(dsDark.resolveToken('resolved.colors.text')?.$value, srgb(0.941, 0.941, 0.941));
 });
 
 // ---------------------------------------------------------------------------
@@ -288,12 +293,12 @@ test('Resolver integration: $defs key is silently ignored', () => {
     $defs: {
       // Some tools use this for bundling; we must not throw on it
       mySharedTokens: {
-        colors: { primary: { $value: '#0000ff', $type: 'color' } },
+        colors: { primary: { $value: srgb(0, 0, 1), $type: 'color' } },
       },
     },
     sets: {
       base: {
-        sources: [{ spacing: { sm: { $value: '4px', $type: 'dimension' } } }],
+        sources: [{ spacing: { sm: { $value: px(4), $type: 'dimension' } } }],
       },
     },
     resolutionOrder: [{ $ref: '#/sets/base' }],
@@ -325,7 +330,7 @@ test('Resolver integration: custom collection name', () => {
         sources: [
           {
             ui: {
-              button: { $value: '#0057ff', $type: 'color' },
+              button: { $value: srgb(0, 0.341, 1), $type: 'color' },
               // Document-relative, so the same document resolves under any
               // collection name. A prefixed form could only ever match one.
               link: { $value: '{ui.button}', $type: 'color' },
@@ -341,12 +346,12 @@ test('Resolver integration: custom collection name', () => {
   const ds = resolver.resolveToDesignSystem({}, undefined, 'mySystem');
 
   assert.ok(ds.getCollection('mySystem'), 'custom collection name should be used');
-  assert.equal(ds.resolveToken('mySystem.ui.button')?.$value.hex, '#0057ff');
-  assert.equal(ds.resolveToken('mySystem.ui.link')?.$value.hex, '#0057ff', 'references must survive a renamed collection');
+  assert.deepEqual(ds.resolveToken('mySystem.ui.button')?.$value, srgb(0, 0.341, 1));
+  assert.deepEqual(ds.resolveToken('mySystem.ui.link')?.$value, srgb(0, 0.341, 1), 'references must survive a renamed collection');
 
   // The very same document, loaded under the default name, resolves identically.
   const dsDefault = new Resolver(doc).resolveToDesignSystem();
-  assert.equal(dsDefault.resolveToken('resolved.ui.link')?.$value.hex, '#0057ff');
+  assert.deepEqual(dsDefault.resolveToken('resolved.ui.link')?.$value, srgb(0, 0.341, 1));
 });
 
 // ---------------------------------------------------------------------------
@@ -366,7 +371,7 @@ test('Resolver integration: populates an existing DesignSystem', async () => {
     version: '2025-11-01',
     sets: {
       base: {
-        sources: [{ colors: { bg: { $value: '#fff', $type: 'color' } } }],
+        sources: [{ colors: { bg: { $value: srgb(1, 1, 1), $type: 'color' } } }],
       },
     },
     resolutionOrder: [{ $ref: '#/sets/base' }],
@@ -381,5 +386,5 @@ test('Resolver integration: populates an existing DesignSystem', async () => {
   assert.ok(existingDs.getCollection('tokens'), 'resolver collection should be added');
 
   assert.equal(existingDs.resolveToken('manual.brand.name')?.$value, 'Acme Corp');
-  assert.equal(existingDs.resolveToken('tokens.colors.bg')?.$value.hex, '#ffffff');
+  assert.deepEqual(existingDs.resolveToken('tokens.colors.bg')?.$value, srgb(1, 1, 1));
 });

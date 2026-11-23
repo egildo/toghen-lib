@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { Collection } from '../../../src/core/collection.js';
-import { DesignToken, InvalidModeError } from '../../../src/core/design-token.js';
+import { DesignToken, InvalidModeError, InvalidTokenError } from '../../../src/core/design-token.js';
 
 describe('Collection', () => {
   it('should correctly set and get a token', () => {
@@ -157,5 +157,79 @@ describe('Collection', () => {
     collection.setToken('font.sans', new DesignToken(stack, 'fontFamily'));
 
     assert.deepStrictEqual(collection.getToken('font.sans')?.$value, stack);
+  });
+});
+
+describe('Collection: a name the Object prototype holds is an ordinary name', () => {
+  const RED = { colorSpace: 'srgb', components: [1, 0, 0] };
+  const GAP = { value: 4, unit: 'px' };
+
+  it('stores and finds a token under constructor, toString and __proto__, and pollutes nothing', () => {
+    const collection = new Collection('test');
+    collection.setToken('constructor.gap', new DesignToken(GAP, 'dimension'));
+    collection.setToken('toString', new DesignToken(RED, 'color'));
+    collection.setToken('__proto__.polluted', new DesignToken(GAP, 'dimension'));
+
+    assert.deepStrictEqual(collection.getAllPaths(), ['constructor.gap', 'toString', '__proto__.polluted']);
+    assert.deepStrictEqual(collection.getToken('constructor.gap')?.$value, GAP);
+    assert.deepStrictEqual(collection.getToken('toString')?.$value, RED);
+    assert.deepStrictEqual(collection.getToken('__proto__.polluted')?.$value, GAP);
+    assert.strictEqual(collection.getNodeKind('valueOf'), 'missing');
+    assert.strictEqual(collection.getToken('hasOwnProperty'), null);
+    assert.strictEqual((Object as unknown as Record<string, unknown>).gap, undefined);
+    assert.strictEqual(({} as Record<string, unknown>).polluted, undefined);
+  });
+
+  it('reads a part key the Object prototype holds as no part, and a vocabulary value of that name as a part', () => {
+    const collection = new Collection('ui');
+    collection.setGroupAttribute('', '$extensions', {
+      'com.toghen': { css: { parts: { state: { hover: ':hover', toString: ':focus' } } } },
+    });
+    collection.setToken('button.constructor.color', new DesignToken(RED, 'color'));
+    collection.setToken('button.toString.color', new DesignToken(RED, 'color'));
+
+    assert.deepStrictEqual(collection.partsOf('button.constructor.color').parts, []);
+    assert.deepStrictEqual(
+      collection.partsOf('button.toString.color').parts.map((part) => [part.axis, part.key, part.spelling]),
+      [['state', 'toString', ':focus']],
+    );
+  });
+});
+
+describe('Collection.check: two tokens with one CSS custom-property name', () => {
+  it('reports the tokens that cssPropertyName spells alike, in document order', () => {
+    const collection = new Collection('ds');
+    const GAP = { value: 4, unit: 'px' };
+    const RED = { colorSpace: 'srgb', components: [1, 0, 0] };
+    collection.setToken('space.a.b', new DesignToken(GAP, 'dimension'));
+    collection.setToken('space.a-b', new DesignToken(GAP, 'dimension'));
+    collection.setToken('bgColor', new DesignToken(RED, 'color'));
+    collection.setToken('bg-color', new DesignToken(RED, 'color'));
+    collection.setToken('ink', new DesignToken(RED, 'color'));
+
+    assert.deepStrictEqual(collection.check().sameCssName, [
+      { name: '--space-a-b', paths: ['space.a.b', 'space.a-b'] },
+      { name: '--bg-color', paths: ['bgColor', 'bg-color'] },
+    ]);
+  });
+});
+
+describe('Collection: the nits', () => {
+  const GAP = { value: 4, unit: 'px' };
+
+  it('refuses a path with an empty segment', () => {
+    const collection = new Collection('test');
+    for (const path of ['', 'a..b', '.a', 'a.']) {
+      assert.throws(() => collection.setToken(path, new DesignToken(GAP, 'dimension')), InvalidTokenError, JSON.stringify(path));
+    }
+    assert.deepStrictEqual(collection.getAllPaths(), []);
+  });
+
+  it('checks the mode a group attribute is read in, as every other read does', () => {
+    const collection = new Collection('test', ['light', 'dark']);
+    collection.setGroupAttribute('space', '$type', 'dimension');
+    assert.strictEqual(collection.getGroupAttribute('space', '$type', 'dark'), 'dimension');
+    assert.throws(() => collection.getGroupAttribute('space', '$type', 'drak'), InvalidModeError);
+    assert.throws(() => collection.getGroupAttribute('nowhere', '$type', 'drak'), InvalidModeError);
   });
 });

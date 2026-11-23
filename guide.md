@@ -30,16 +30,16 @@ Without that line the install stops with `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`,
 
 ## Create a token
 
-A token has a value and a type, and can have a description and extensions. Tokens are immutable, so each change returns a new token:
+A token has a value and a type, and can have a description and extensions. Tokens are immutable: a token has no methods, its value cannot be changed in place, and a change is a new token:
 
 ```ts
 import { DesignToken } from '@toghen/lib';
 
 const accent = new DesignToken('#1a66e6', 'color', 'Accent surface');
-const brighter = accent.set('$value', '#5c9bff'); // accent is unchanged
+const brighter = new DesignToken('#5c9bff', accent.$type, accent.$description); // accent is unchanged
 ```
 
-`update()` and `merge()` change a token the same way. See [`DesignToken`](./reference.md#designtoken).
+See [`DesignToken`](./reference.md#designtoken).
 
 ## Organize tokens in a collection
 

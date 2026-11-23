@@ -87,7 +87,9 @@ function deepMergeTokenStructures(base: Record<string, any>, incoming: Record<st
   const result: Record<string, any> = { ...base };
 
   for (const [key, incomingVal] of Object.entries(incoming)) {
-    const baseVal = result[key];
+    // Own keys only, and defined rather than assigned, so `__proto__` and `constructor` are names like any other.
+    const baseVal = Object.prototype.hasOwnProperty.call(result, key) ? result[key] : undefined;
+    let merged: unknown;
 
     // Both sides are plain objects (i.e. token groups) → recurse
     if (
@@ -98,14 +100,24 @@ function deepMergeTokenStructures(base: Record<string, any>, incoming: Record<st
       typeof incomingVal === 'object' &&
       !Array.isArray(incomingVal)
     ) {
-      result[key] = deepMergeTokenStructures(baseVal as Record<string, any>, incomingVal as Record<string, any>);
+      merged = deepMergeTokenStructures(baseVal as Record<string, any>, incomingVal as Record<string, any>);
     } else {
       // Scalar, array, or leaf token — incoming wins
-      result[key] = incomingVal;
+      merged = incomingVal;
     }
+    Object.defineProperty(result, key, { value: merged, enumerable: true, writable: true, configurable: true });
   }
 
   return result;
+}
+
+/** Freezes a value and everything in it. */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const member of Object.values(value)) deepFreeze(member);
+  }
+  return value;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +184,9 @@ export class Resolver {
    *   - A modifier's `default` does not exist in its `contexts`
    */
   constructor(document: ResolverDocument) {
-    this.doc = document;
+    // A frozen copy: what the caller does to its document afterwards does not reach the resolver, and what the
+    // resolver gives out (a chain's values, a modifier's `$extensions`) cannot change it.
+    this.doc = deepFreeze(structuredClone(document));
     this.validateDocument();
   }
 
@@ -192,7 +206,9 @@ export class Resolver {
    *   Case-insensitive; values must be strings.
    *   Modifiers with a `default` are optional in the input.
    *
-   * @returns A merged DTCG token object ready for further processing.
+   * @returns A merged DTCG token object ready for further processing, sharing
+   *   nothing with the document: changing it changes neither the document nor a
+   *   later `resolve()`.
    *
    * @throws {InvalidInputError} When the input is invalid for this document.
    * @throws {InvalidReferenceError} When a `$ref` cannot be resolved.
@@ -204,6 +220,15 @@ export class Resolver {
    * ```
    */
   public resolve(input: ResolverInput = {}): Record<string, any> {
+    // The merge shares the resolver's frozen copy of the document, so the caller gets a copy it may change.
+    return structuredClone(this.merged(input));
+  }
+
+  /**
+   * `resolve()` without the copy: the merged structure, which shares the frozen objects of the resolver's copy of the
+   * document. For the builds, which keep a token's value as a copy, and a group's attributes as they are, frozen.
+   */
+  private merged(input: ResolverInput): Record<string, any> {
     // Stage 1 — input validation
     const normalizedInput = this.validateAndNormalizeInput(input);
 
@@ -235,7 +260,7 @@ export class Resolver {
    * ```
    */
   public resolveToDesignSystem(input: ResolverInput = {}, system?: DesignSystem, collectionName?: string): DesignSystem {
-    const flatTokens = this.resolve(input);
+    const flatTokens = this.merged(input);
 
     const ds = system ?? new DesignSystem();
     const name = collectionName ?? this.doc.name ?? 'resolved';
@@ -256,7 +281,7 @@ export class Resolver {
    * for every theme at once.
    *
    * That is what makes the mode argument downstream meaningful —
-   * `system.resolveValue(path, 'dark')`, `entries('dark')`, or
+   * `system.resolveValue(path, 'dark')`, `getAllPaths('dark')`, or
    * `toghen(path, dark)` in CSS. Against a system built from a single
    * permutation those would quietly return the one context it holds.
    *
@@ -334,13 +359,14 @@ export class Resolver {
     const collection = new Collection(name, modeNames);
 
     inputs.forEach((input, index) => {
-      this.loadTokensIntoCollection(this.resolve(input), collection, [], modeNames[index]);
+      this.loadTokensIntoCollection(this.merged(input), collection, [], modeNames[index]);
     });
 
     const contextsOf = (input: ResolverInput): Record<string, string> => {
       const contexts: Record<string, string> = {};
+      const chosen = this.spelled(input);
       for (const [modifierName, modifier] of this.collectEffectiveModifiers()) {
-        const context = input[modifierName] ?? modifier.default;
+        const context = chosen[modifierName] ?? modifier.default;
         if (context !== undefined) contexts[modifierName] = context;
       }
       return contexts;
@@ -371,8 +397,9 @@ export class Resolver {
    *
    * A document with no modifiers has exactly one context, named `'default'`.
    *
-   * @param input - Modifier context selections; omitted modifiers use their default
-   * @returns A stable mode name, e.g. `'dark'` or `'dark/compact'`
+   * @param input - Modifier context selections, matched regardless of case; omitted modifiers use their default
+   * @returns A stable mode name, e.g. `'dark'` or `'dark/compact'`, each context as the document spells it
+   * @throws {InvalidInputError} For an unknown modifier or context, as {@link resolve} does
    *
    * @example
    * ```typescript
@@ -384,12 +411,29 @@ export class Resolver {
    */
   public getModeName(input: ResolverInput): string {
     const modifiers = this.collectEffectiveModifiers();
+    const chosen = this.spelled(input);
 
     const parts = Array.from(modifiers.entries())
-      .map(([modifierName, modifier]) => input[modifierName] ?? modifier.default)
+      .map(([modifierName, modifier]) => chosen[modifierName] ?? modifier.default)
       .filter((context): context is string => context !== undefined);
 
     return parts.length === 0 ? 'default' : parts.join('/');
+  }
+
+  /**
+   * The input with each modifier and context as the document spells them, matched without regard to case as
+   * `resolve()` matches them. An omitted modifier is left out.
+   *
+   * @throws {InvalidInputError} As `resolve()` does, for an unknown modifier or context, or a value that is not a string
+   */
+  private spelled(input: ResolverInput): Record<string, string> {
+    const modifiers = this.collectEffectiveModifiers();
+    return Object.fromEntries(
+      Object.entries(this.validateAndNormalizeInput(input, false)).map(([name, context]) => [
+        name,
+        Object.keys(modifiers.get(name)!.contexts).find((c) => c.toLowerCase() === context)!,
+      ]),
+    );
   }
 
   /** Document name, if set. */
@@ -592,7 +636,7 @@ export class Resolver {
     const ix = this.chainIndex();
     let early: Record<string, any> | undefined;
     const earlyRead = (p: string, prop: LeafProperty) => {
-      early ??= this.resolve(input);
+      early ??= this.merged(input);
       const node = p.split('.').reduce((o: any, k) => o?.[k], early);
       return node && Object.prototype.hasOwnProperty.call(node, prop) ? { v: node[prop] } : undefined;
     };
@@ -708,7 +752,9 @@ export class Resolver {
   /**
    * Collects all effective modifiers available to the resolver.
    * Includes top-level `doc.modifiers` and inline modifiers declared in
-   * `resolutionOrder`.
+   * `resolutionOrder`. A top-level modifier carries the overrides written beside
+   * the `$ref` that names it in `resolutionOrder`, as `resolve()` applies them,
+   * so its default and contexts are the same in every answer.
    */
   private collectEffectiveModifiers(): Map<string, ResolverModifier> {
     const modifiers = new Map<string, ResolverModifier>();
@@ -718,7 +764,14 @@ export class Resolver {
     }
 
     for (const item of this.doc.resolutionOrder) {
-      if (!isReferenceObject(item) && (item as Partial<InlineModifier>).type === 'modifier' && (item as Partial<InlineModifier>).name) {
+      if (isReferenceObject(item)) {
+        const { $ref, ...overrides } = item;
+        const named = /^#\/modifiers\/([^/]+)$/.exec($ref);
+        const name = named && unescapePointerSegment(named[1]);
+        if (name && modifiers.has(name) && Object.keys(overrides).length > 0) {
+          modifiers.set(name, shallowMerge(modifiers.get(name)!, overrides));
+        }
+      } else if ((item as Partial<InlineModifier>).type === 'modifier' && (item as Partial<InlineModifier>).name) {
         const inline = item as InlineModifier;
         modifiers.set(inline.name, inline);
       }
@@ -804,8 +857,7 @@ export class Resolver {
 
     // Determine whether the target is a set or modifier by path
     if (pointer.startsWith('#/sets/')) {
-      const setName = pointer.slice('#/sets/'.length).split('/')[0];
-      return this.flattenSet(target as ResolverSet & { name?: string }, setName);
+      return this.flattenSet(target as ResolverSet & { name?: string }, [pointer]);
     }
 
     if (pointer.startsWith('#/modifiers/')) {
@@ -824,12 +876,15 @@ export class Resolver {
   /**
    * Merges all `sources` of a set in array order (last wins) into a single
    * token structure.
+   *
+   * @param via - The pointers of the sets being flattened, outermost first, so a set that refers back to one of
+   *   them is a cycle (Resolver §4.2: reference objects MUST NOT be circular)
    */
-  private flattenSet(set: ResolverSet & { name?: string }, _setName?: string): Record<string, any> {
+  private flattenSet(set: ResolverSet & { name?: string }, via: string[] = []): Record<string, any> {
     let result: Record<string, any> = {};
 
     for (const source of set.sources) {
-      const tokens = this.resolveTokenSource(source, 'set');
+      const tokens = this.resolveTokenSource(source, 'set', undefined, via);
       result = deepMergeTokenStructures(result, tokens);
     }
 
@@ -873,8 +928,14 @@ export class Resolver {
    * @param source - The token source to resolve.
    * @param sourceKind - `'set'` or `'modifier'` (for error messages).
    * @param modifierName - Name of the enclosing modifier (for error messages).
+   * @param via - The pointers of the sets being flattened, as {@link flattenSet} takes them.
    */
-  private resolveTokenSource(source: TokenSource, sourceKind: 'set' | 'modifier', modifierName?: string): Record<string, any> {
+  private resolveTokenSource(
+    source: TokenSource,
+    sourceKind: 'set' | 'modifier',
+    modifierName?: string,
+    via: string[] = [],
+  ): Record<string, any> {
     if (!isReferenceObject(source)) {
       // Inline DTCG token object — use as-is
       return source as Record<string, any>;
@@ -899,6 +960,10 @@ export class Resolver {
       throw new InvalidReferenceError(`$ref "${pointer}" in a token source must point to a named set (#/sets/<name>).`);
     }
 
+    if (via.includes(pointer)) {
+      throw new InvalidReferenceError(`$ref "${pointer}" closes a cycle: ${[...via, pointer].join(' → ')}.`);
+    }
+
     const docAny = this.doc as Record<string, any>;
     let target = resolveJsonPointer(docAny, pointer);
 
@@ -916,7 +981,7 @@ export class Resolver {
     }
 
     // Recursively flatten the referenced set
-    return this.flattenSet(target as ResolverSet);
+    return this.flattenSet(target as ResolverSet, [...via, pointer]);
   }
 
   // -------------------------------------------------------------------------
@@ -982,9 +1047,10 @@ export class Resolver {
       throw new ResolverValidationError('Resolver document must declare a "resolutionOrder" array.');
     }
 
-    // Validate modifiers
-    for (const [name, modifier] of Object.entries(this.doc.modifiers ?? {})) {
-      this.validateModifier(name, modifier);
+    // Validate modifiers, with the overrides beside the $ref that names each
+    const effective = this.collectEffectiveModifiers();
+    for (const name of Object.keys(this.doc.modifiers ?? {})) {
+      this.validateModifier(name, effective.get(name)!);
     }
 
     // Validate resolutionOrder items

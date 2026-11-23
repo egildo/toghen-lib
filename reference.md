@@ -102,7 +102,9 @@ new DesignToken(
 | `$description` | `string` | Human-readable description; `''` when none was given |
 | `$extensions` | `Record<string, any> \| null` | W3C extension data |
 
-A token has no methods. It is immutable: a change is a new `DesignToken`. What a token refers to is
+A token has no methods. It is immutable: a change is a new `DesignToken`. Its `$value` and `$extensions` are
+copied when it is made and frozen, so it shares nothing with what it was made from, and changing what it gives
+out in place throws a `TypeError`. What a token refers to is
 [`referencesOf()`](#referencesofpath-mode-tokenreference) for a stored token, and
 [`referencesIn()`](#referencesinvalue-collectionname-tokenreference) for any value.
 
@@ -133,7 +135,8 @@ collection.setToken('primary.blue', blueToken);                  // all modes
 collection.setToken('ui.background', darkToken, 'dark');         // dark only
 ```
 
-Throws `InvalidModeError` if `mode` is not declared by the collection.
+Throws `InvalidModeError` if `mode` is not declared by the collection, and `InvalidTokenError` for a path with an
+empty segment (`''`, `a..b`), a segment starting with `$`, or one holding `{` or `}`.
 
 Checks the value against its type and stores it in the type's structured shape.
 See [Token values](#token-values). The type is the token's own `$type`, else the
@@ -160,7 +163,9 @@ it names a **group** (which is not a token), or when the token has no value in
 that mode.
 
 Throws `InvalidModeError` for a mode the collection does not declare, rather
-than returning another mode's value.
+than returning another mode's value. `mode` omitted is the collection's default mode; the string `'default'` is
+not a sentinel here, as it is for `DesignSystem`, but a mode name, which a collection built with modes such as
+`light` and `dark` does not declare.
 
 ```typescript
 const token = collection.getToken('primary.blue');
@@ -214,7 +219,8 @@ Cannot set '$description' on 'space.md': 'space.md' is a token, and a group attr
 #### `getGroupAttribute(path, attribute, mode?): any`
 
 Gets group-level metadata in `mode`, the collection's default when omitted; `null` when the group does not
-declare it, or the path is not a group. A value that is falsy is a value: a group's `$deprecated: false` reads
+declare it, or the path is not a group. An undeclared `mode` throws `InvalidModeError`, whether or not the attribute
+differs between modes. A value that is falsy is a value: a group's `$deprecated: false` reads
 `false`, through every build.
 
 ```typescript
@@ -540,15 +546,17 @@ hand. An adapter that needs the per-modifier questions
 
 #### `check(): Check`
 
-What is wrong with the collection's tokens, in one call: the tokens with no value in some mode and, for a
-collection a resolver built, the holes of every chain and every non-factorable token. A token added by hand, which
-the resolver's document does not hold, is checked for its modes only.
+What is wrong with the collection's tokens, in one call: the tokens with no value in some mode, the tokens
+[`cssPropertyName`](#csspropertyname) gives one custom-property name, and, for a collection a resolver built, the
+holes of every chain and every non-factorable token. A token added by hand, which the resolver's document does not
+hold, is checked for its modes and its name only.
 
 ```typescript
 collection.check();
 // { incomplete: [{ path: 'card.glow', missingModes: ['low/light', 'high/light'] }],
 //   holes: [{ path: 'card.glow', property: '$value', holes: [{ theme: 'light' }] }, …],
-//   nonFactorable: [{ path: 'card.shadow', property: '$value', reason: 'partial-composite', … }] }
+//   nonFactorable: [{ path: 'card.shadow', property: '$value', reason: 'partial-composite', … }],
+//   sameCssName: [{ name: '--space-a-b', paths: ['space.a.b', 'space.a-b'] }] }
 ```
 
 ```typescript
@@ -556,6 +564,7 @@ interface Check {
   incomplete: Array<{ path: string; missingModes: string[] }>;
   holes: Array<{ path: string; property: LeafProperty; holes: Array<Record<string, string>> }>;
   nonFactorable: NonFactorable[];
+  sameCssName: Array<{ name: string; paths: string[] }>; // in document order, the paths of each name too
 }
 ```
 
@@ -655,7 +664,7 @@ Returns the names of all registered collections.
 
 #### `resolveValue(path, mode?): any`
 
-Resolves a token value, expanding every reference it contains, including those nested inside composite values and arrays. `mode` defaults to the string `'default'`. Every method of `DesignSystem` that takes a mode reads that sentinel as "this collection's default mode" (`getDefaultMode()`), whatever that mode is called. A collection may declare a mode named `default` too, and the two then coincide. `resolveToken()`, `referencesOf()` and `getToken()` take the same sentinel.
+Resolves a token value, expanding every reference it contains, including those nested inside composite values and arrays. `mode` defaults to the string `'default'`. Every method of `DesignSystem` that takes a mode reads that sentinel as "this collection's default mode" (`getDefaultMode()`), whatever that mode is called. A collection may declare a mode named `default` too, and the two then coincide. `resolveToken()` and `referencesOf()` take the same sentinel. `Collection.getToken()` does not: omitted, its mode is the collection's default, and `'default'` is a mode name like any other, so a collection that declares no mode of that name throws `InvalidModeError` for it.
 
 Throws on a dangling, malformed, or circular reference rather than passing the
 `{...}` text through. See [Error Classes](#error-classes).
@@ -802,13 +811,14 @@ new Resolver(document: ResolverDocument)
 - A `TokenSource` is an inline token tree or a `ReferenceObject`, `{ "$ref": "…" }`.
 - A `ResolutionOrderItem` is a `ReferenceObject` naming `#/sets/<name>` or `#/modifiers/<name>`, or an `InlineSet` / `InlineModifier`, `{ name, type: 'set' | 'modifier', sources | contexts }`.
 - `Resolver` follows same-document pointers only (RFC 6901: `~1` is `/`, `~0` is `~`); a pointer to a file is inlined first by [`load`](#loadentry-options-promiseloadresult).
+- Keys beside a `$ref` override what it names, shallowly: an object or array given there replaces the one it names whole. A modifier's `default` or `contexts` given beside its `$ref` in `resolutionOrder` is its default and its contexts in every answer: `resolve()`, `getModifiers()`, `getPermutations()`, mode names, the builds and the per-modifier queries.
 - `ResolverModifierDef` is an alias of `ResolverModifier`.
 
 A `ResolverInput` is `Record<string, string>`: a modifier name to a context name, matched regardless of case. It is what `resolve()`, `resolveToDesignSystem()`, `getModeName()` and the query methods that take an input take.
 
 Why the document is shaped this way, and the stages it goes through, are in [specs.md](./specs.md#w3c-resolver-module).
 
-Validates the document on construction. Throws `ResolverValidationError` if the document is invalid. Safe to create once and call `resolve()` many times with different inputs.
+Validates the document on construction. Throws `ResolverValidationError` if the document is invalid. Safe to create once and call `resolve()` many times with different inputs. The resolver keeps a frozen copy of the document: a change to the document afterwards does not reach it, and what it gives out from the document (a chain's values, a modifier's `$extensions`, a group's attributes in a build) is frozen, so changing it in place throws a `TypeError`.
 
 ### `name` (getter)
 
@@ -866,7 +876,7 @@ string is ignored; surrounding whitespace is trimmed.
 
 ### `resolve(input?): Record<string, any>`
 
-Returns a flat DTCG token object. Token aliases (e.g., `{ $value: '{color.primary}' }`) are **preserved as strings**.
+Returns a flat DTCG token object. Token aliases (e.g., `{ $value: '{color.primary}' }`) are **preserved as strings**. The object is a copy and shares nothing with the document: changing it changes neither the document nor a later `resolve()`.
 
 ```typescript
 const tokens = resolver.resolve({ theme: 'dark' });
@@ -931,11 +941,12 @@ The full name (`dark/compact`) keeps working. `Collection.modeNamed()` does the 
 
 ### `getModeName(input): string`
 
-The canonical mode name for a set of modifier selections: context values joined with `/` in the order the document declares its modifiers (the order of [`getModifiers()`](#getmodifiersorder-modemodifier)), so the name never depends on the input object's key order. An omitted modifier contributes its `default`. A modifier with no `default` and no selection contributes nothing: `getModeName()` leaves it out of the name, where `resolve()` would refuse it.
+The canonical mode name for a set of modifier selections: context values joined with `/` in the order the document declares its modifiers (the order of [`getModifiers()`](#getmodifiersorder-modemodifier)), so the name never depends on the input object's key order. An omitted modifier contributes its `default`. A modifier with no `default` and no selection contributes nothing: `getModeName()` leaves it out of the name, where `resolve()` would refuse it. Names are matched as `resolve()` matches them, regardless of case, and the name spells each context as the document does; an unknown modifier or context throws `InvalidInputError`, as in `resolve()`.
 
 ```typescript
 // modifiers: theme (default 'light'), density (default 'cosy')
 resolver.getModeName({ theme: 'dark' });                     // 'dark/cosy'
+resolver.getModeName({ Theme: 'DARK' });                     // 'dark/cosy'
 resolver.getModeName({ density: 'compact', theme: 'dark' }); // 'dark/compact'
 resolver.getModeName({});                                    // 'light/cosy'
 ```
@@ -1357,14 +1368,14 @@ All are named exports supporting `instanceof` checks.
 |---|---|---|
 | `InvalidTokenError` | `Collection.setToken`, `Collection.setGroupAttribute`, `Collection.getGroupAttribute`, the parts methods (`vocabularyAt()`, `partsOf()`, `partAt()`, `axesOf()`, `applies()`), `normalizeTokenValue()`, `DesignSystem.resolveValue()`, `resolveToken()`, `Resolver.valueAt()`, `contextsOf()` | A path segment that is empty or starts with `$`, a path that would make one node both a token and a group, or a group attribute set on a token's path; a group attribute name without `$`; a value its type rejects, on load or once it resolves; an invalid parts vocabulary, a key that is a value of two axes, or a path nesting two parts of one axis. The `DesignToken` constructor itself never throws |
 | `PathNotFoundError` | `DesignSystem.resolveValue()` | Lookup path doesn't exist |
-| `UnresolvableReferenceError` | Resolution engine | A `{reference}` inside a `$value` names no token, names a group, or is malformed. Extends `PathNotFoundError`; carries `reference`, `tokenPath`, `collectionName`, `mode`, `reason` (`'not-found' \| 'group' \| 'no-value' \| 'malformed'`) |
+| `UnresolvableReferenceError` | Resolution engine | A `{reference}` inside a `$value` names no token, names a group, or is malformed; or a `$value` or a member of one is a JSON Pointer `{ "$ref": … }` (W3C §7.1.2), which is not supported yet. Extends `PathNotFoundError`; carries `reference` (a `$ref`'s pointer), `tokenPath`, `collectionName`, `mode`, `reason` (`'not-found' \| 'group' \| 'no-value' \| 'malformed' \| 'unsupported'`) |
 | `InvalidInterpolationError` | Resolution engine | A non-scalar was interpolated into a string. Extends `InvalidTokenError`; carries `reference`, `tokenPath` |
 | `InvalidModeError` | Collection access | Specified mode doesn't exist |
 | `CollectionNotFoundError` | `DesignSystem` | A lookup path names no collection, and the system has more than one |
 | `CircularReferenceError` | Resolution engine | Token references create a cycle |
 | `ResolverValidationError` | `Resolver` constructor, `getContextSelector()`, `getLightDark()` | Wrong `version`, invalid modifier structure, a name occurring twice in `resolutionOrder` (inline or by `$ref`; sets and modifiers share the namespace); a modifier's CSS spelling that is not a string, or an `atRule` that does not start with `@`; a `lightDark` that is malformed, names a non-context, sits on a modifier without exactly two contexts, or sits beside another spelling |
 | `InvalidInputError` | `Resolver.resolve()`, `valueAt()` | Unknown modifier key, non-string value, missing required selection |
-| `InvalidReferenceError` | `Resolver.resolve()`, `load()`, `contextsOf()` | Unresolvable `$ref`, pointer to `#/resolutionOrder/…`, modifier referencing modifier; a file `load` cannot read or parse; a generated chain path that collides with a token |
+| `InvalidReferenceError` | `Resolver.resolve()`, `load()`, `contextsOf()` | Unresolvable `$ref`, pointer to `#/resolutionOrder/…`, modifier referencing modifier, a set whose sources refer back to it (the message gives the cycle); a file `load` cannot read or parse; a generated chain path that collides with a token |
 
 ---
 
@@ -1429,11 +1440,11 @@ Any further member, keyed by a CSS property in camelCase
 a finite number. The lib does not check that the key is a property; the PostCSS
 plugin does, and the Figma adapter leaves it out of the text style.
 
-`fontFamily` is one family name or a font stack, `['Inter', 'sans-serif']`. A
-stack must not be empty, and every entry must be a non-empty string. A
-`{reference}` to a `fontFamily` token is a string like any other, and resolves
-to whatever that token holds. `getFontFamily()` returns the stored value, a
-string or an array; it does not flatten a stack.
+`fontFamily` is one family name or a font stack, `['Inter', 'sans-serif']`, checked as a `fontFamily` token is
+(see [Token values](#token-values)). A `{reference}` to a `fontFamily` token is a string like any other: as the
+whole member it resolves to whatever that token holds, and as an entry of a stack it is spread into the stack,
+`['{font.base}', 'serif']` becoming `['Inter', 'Arial', 'serif']`. `getFontFamily()` returns the stored value, a
+string or an array.
 
 ### `ShadowValue`
 
@@ -1489,7 +1500,7 @@ Both forms are accepted everywhere a gradient is read, and `normalizeGradient(va
 `NormalizedGradient` for either. An `angle` is stored as a number of degrees. Written as a string it may be in
 `deg`, `grad`, `rad` or `turn`, `calc()` included (`'0.25turn'` and `'calc(45deg + 0.125turn)'` are `90`); a unitless
 string is degrees, as a number is. A stop's colour takes any colour string; `currentColor` is kept as the string.
-A position lies in [0, 1].
+A position outside [0, 1] is clamped into it, as W3C §9.7 says: stored clamped on load, and clamped by `normalizeGradient`.
 
 ### `DimensionValue`
 
@@ -1574,9 +1585,10 @@ Reads a `lineHeight`: a number or numeric string is a `ratio` of the font size, 
 cssPropertyName(lookupPath: string): string
 cssPropertyName('ds.surface.accent');         // '--surface-accent'
 cssPropertyName('ds.button.backgroundColor'); // '--button-background-color'
+cssPropertyName('ds.size.1/2');               // '--size-1\\/2'
 ```
 
-A token's CSS custom-property name, `--` included: the token path without the collection segment, each segment spelled by [`cssIdentifier`](#cssidentifier), joined by `-`. `@toghen/postcss` names properties with it by default, and the Figma adapter writes the same name as a variable's code syntax.
+A token's CSS custom-property name, `--` included: the token path without the collection segment, each segment spelled by [`cssIdentifier`](#cssidentifier), joined by `-`. What an identifier cannot hold is escaped with a backslash, as `cssLinkName` escapes it: every character but a letter, a digit, `_`, `-` and a non-ASCII one. A name that is already an identifier is unchanged. Two paths may still give one name (`space.a.b` and `space.a-b`, `bgColor` and `bg-color`); [`check()`](#check-check) lists them in `sameCssName`. `@toghen/postcss` names properties with it by default, and the Figma adapter writes the same name as a variable's code syntax.
 
 ### `cssLinkName`
 
@@ -1725,7 +1737,7 @@ says why: `'<text>' cannot be computed: <reason>`. The principle is in
 | `letterSpacing` | [`LetterSpacingValue`](#letterspacingvalue) | A number and a unit, `'-0.021em'`, `'2px'`, `'0.1rem'`, and `'0'` as `0px`; the unit may be in any case and is stored lower case. The same functions as `dimension`; `em` mixes only with `em` (`calc(0.1em - 0.02em)` is `0.08em`). A typography member's `letterSpacing` may reference one |
 | `fontWeight` | A number from 1 to 1000 | A W3C keyword in any case (`thin` 100, `light` 300, `normal` 400, `medium` 500, `semi-bold` 600, `bold` 700, `black` 900, `extra-black` 950, and their aliases), which becomes its number; a numeric string or a `calc()` (`'calc(400 + 300)'`) |
 | `border` | [`BorderValue`](#bordervalue) | `color` any colour string, `width` any `dimension` string, `style` a W3C keyword or `{ dashArray, lineCap }`, each dash any `dimension` string |
-| `fontFamily` | A string (one family) or an array of strings | A string with a comma outside quotes, `"'Inter', system-ui, sans-serif"`, which becomes the array by [`fontFamilyNames`](#fontfamilynames) |
+| `fontFamily` | A non-empty string (one family) or a non-empty array of non-empty strings | A string with a comma outside quotes, `"'Inter', system-ui, sans-serif"`, which becomes the array by [`fontFamilyNames`](#fontfamilynames). A stack inside the array, which a reference to a stack puts there (`['{font.base}', 'serif']`), is spread into it when the reference resolves. Refused: an empty string, an empty array, an entry that is not a non-empty string, any other shape |
 | `shadow`, `typography`, `gradient` | Their [interfaces](#composite-value-interfaces) | Members may use the string forms above, and every member is stored computed: a shadow's `color: '#abc'` is a structured colour with `hex: '#aabbcc'`, `'16px'` is `{ value: 16, unit: 'px' }`, a typography `fontWeight` keyword is its number, a gradient `angle` is a number of degrees. A shadow's, a gradient stop's and a border's colour take `transparent`, and keep `currentColor` as the string |
 
 **A token defined in one context only** (in a modifier context's source and in no base set) exists in the modes that context reaches and nowhere else: elsewhere `getToken()` and `resolveToken()` return `null`, `resolveValue()` throws that the token is not found, and the default mode does not hold it. It is a hole of its chain, and [`Collection.check()`](#check-check) lists it as incomplete, with the modes it lacks.
@@ -1737,10 +1749,12 @@ once it resolves. It is checked and computed when it resolves, by
 [`valueAt()`](#method-valueat), in each mode, and a value its type cannot compute throws there.
 
 A reference embedded in a longer string interpolates a dimension as `'24px'`
-and a structured colour of any space as CSS: its `hex` when it carries one, with
-the alpha byte appended to a six-digit hex when the alpha is below 1 (so
-`transparent` is `#00000000`), otherwise CSS Color 4 syntax in its own space
-(`oklch(0.7 0.1 200)`). Lib's colour reader reads every such spelling back, so
+and a structured colour of any space as CSS, spelled from its space, components
+and alpha, never from its `hex`, which W3C makes a fallback. An sRGB colour that
+carries a `hex`, and whose channels and alpha are whole bytes, is the hex those
+give, with the alpha byte appended when the alpha is below 1 (so `transparent` is
+`#00000000`); any other is CSS Color 4 syntax in its own space
+(`oklch(0.7 0.1 200)`, `color(srgb 0 0 0 / 0.5)`). Lib's colour reader reads every such spelling back, so
 `'color-mix(in oklch, {ink} 40%, white)'` computes whatever space `ink` is in. A
 token whose own value holds a reference is inserted as its resolved string. The
 library refuses to interpolate any other object.
