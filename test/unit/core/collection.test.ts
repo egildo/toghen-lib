@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { Collection } from '../../../src/core/collection.js';
-import { DesignToken, InvalidModeError } from '../../../src/core/design-token.js';
+import { DesignToken, InvalidModeError, InvalidTokenError } from '../../../src/core/design-token.js';
 
 describe('Collection', () => {
   it('should correctly set and get a token', () => {
@@ -211,5 +211,25 @@ describe('Collection.check: two tokens with one CSS custom-property name', () =>
       { name: '--space-a-b', paths: ['space.a.b', 'space.a-b'] },
       { name: '--bg-color', paths: ['bgColor', 'bg-color'] },
     ]);
+  });
+});
+
+describe('Collection: the nits', () => {
+  const GAP = { value: 4, unit: 'px' };
+
+  it('refuses a path with an empty segment', () => {
+    const collection = new Collection('test');
+    for (const path of ['', 'a..b', '.a', 'a.']) {
+      assert.throws(() => collection.setToken(path, new DesignToken(GAP, 'dimension')), InvalidTokenError, JSON.stringify(path));
+    }
+    assert.deepStrictEqual(collection.getAllPaths(), []);
+  });
+
+  it('checks the mode a group attribute is read in, as every other read does', () => {
+    const collection = new Collection('test', ['light', 'dark']);
+    collection.setGroupAttribute('space', '$type', 'dimension');
+    assert.strictEqual(collection.getGroupAttribute('space', '$type', 'dark'), 'dimension');
+    assert.throws(() => collection.getGroupAttribute('space', '$type', 'drak'), InvalidModeError);
+    assert.throws(() => collection.getGroupAttribute('nowhere', '$type', 'drak'), InvalidModeError);
   });
 });

@@ -376,6 +376,7 @@ export class Collection {
    * ```
    *
    * Path validation ensures that:
+   * - No path segment is empty (`a..b`, `''`)
    * - No path segment starts with '$' (reserved for metadata)
    * - No path segment contains '{', '}', or '.' characters
    *
@@ -409,6 +410,9 @@ export class Collection {
   public setToken(path: string, token: DesignToken, mode?: string): void {
     const pathParts = path.split('.');
     for (const part of pathParts) {
+      if (part === '') {
+        throw new InvalidTokenError(`Invalid token path '${path}': a segment is empty.`);
+      }
       if (part.startsWith('$') || part.includes('{') || part.includes('}') || part.includes('.')) {
         throw new InvalidTokenError(`Invalid token name: ${part}`);
       }
@@ -691,6 +695,7 @@ export class Collection {
    * @returns The attribute's value, or null if not found
    *
    * @throws {InvalidTokenError} When attribute name doesn't start with '$'
+   * @throws {InvalidModeError} When `mode` is not one of the collection's
    *
    * @example
    * ```typescript
@@ -718,6 +723,8 @@ export class Collection {
     if (!attribute.startsWith('$')) {
       throw new InvalidTokenError(`Invalid group attribute '${attribute}'. Attributes must start with '$'.`);
     }
+    // An undeclared mode throws here as on every other read, whether or not the attribute differs between modes.
+    mode = this.modeNamed(mode);
 
     const pathParts = path === '' ? [] : path.split('.'); // the empty path is the root of the collection
 
@@ -731,7 +738,7 @@ export class Collection {
 
     // A falsy value is a value: `$deprecated: false` reads false.
     const value = current[attribute];
-    if (value instanceof ModeAttribute) return value.values.get(this.modeNamed(mode)) ?? null;
+    if (value instanceof ModeAttribute) return value.values.get(mode) ?? null;
     return value ?? null;
   }
 

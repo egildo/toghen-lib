@@ -135,7 +135,8 @@ collection.setToken('primary.blue', blueToken);                  // all modes
 collection.setToken('ui.background', darkToken, 'dark');         // dark only
 ```
 
-Throws `InvalidModeError` if `mode` is not declared by the collection.
+Throws `InvalidModeError` if `mode` is not declared by the collection, and `InvalidTokenError` for a path with an
+empty segment (`''`, `a..b`), a segment starting with `$`, or one holding `{` or `}`.
 
 Checks the value against its type and stores it in the type's structured shape.
 See [Token values](#token-values). The type is the token's own `$type`, else the
@@ -218,7 +219,8 @@ Cannot set '$description' on 'space.md': 'space.md' is a token, and a group attr
 #### `getGroupAttribute(path, attribute, mode?): any`
 
 Gets group-level metadata in `mode`, the collection's default when omitted; `null` when the group does not
-declare it, or the path is not a group. A value that is falsy is a value: a group's `$deprecated: false` reads
+declare it, or the path is not a group. An undeclared `mode` throws `InvalidModeError`, whether or not the attribute
+differs between modes. A value that is falsy is a value: a group's `$deprecated: false` reads
 `false`, through every build.
 
 ```typescript
