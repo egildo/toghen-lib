@@ -154,7 +154,7 @@ export class UnresolvableReferenceError extends PathNotFoundError {
  * spliced into the surrounding string.
  *
  * Only reachable through partial-string interpolation — a Toghen extension
- * beyond the W3C format (see {@link DesignToken.isReference}). Interpolating an
+ * beyond the W3C format (see specs.md, "Partial-string interpolation"). Interpolating an
  * object or array would silently produce `"[object Object]"`, so it is refused.
  *
  * @example

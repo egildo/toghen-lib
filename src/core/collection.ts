@@ -182,7 +182,6 @@ class ModeValues {
  * console.log(token?.$value.hex); // '#007bff'
  *
  * // Work with modes
- * colors.setDefaultMode('dark');
  * const allPaths = colors.getAllPaths('light');
  * ```
  *
@@ -216,7 +215,7 @@ export class Collection {
 
   /**
    * The resolver that built this collection, so an adapter can put the
-   * per-modifier questions (`dependsOn`, `contextsOf`, `step`, `valueAt`) to
+   * per-modifier questions (`dependsOn`, `contextsOf`, `valueAt`) to
    * it. Set by `resolveAllToDesignSystem()` and `resolveContextsToDesignSystem()`;
    * a collection built by hand has none.
    */
@@ -492,13 +491,13 @@ export class Collection {
    * Retrieves a token from a specific path and mode.
    * 
    * This method navigates the hierarchical token structure to find and return
-   * the token at the specified path. For multi-mode collections, it handles
-   * mode-specific token resolution with fallback to the default mode.
+   * the token at the specified path. For multi-mode collections, it returns
+   * the token of the mode asked, and no mode falls back to another.
    * 
    * Mode resolution logic:
    * - If token has single value, return that value regardless of mode
-   * - If token has multiple values, return value for requested mode
-   * - If requested mode not found, fallback to default mode (first in array)
+   * - If token has multiple values, return value for requested mode, or null when it has none there
+   * - If the mode is not declared, throw `InvalidModeError`; omitted, it is the default mode
    * 
    * @param path - Dot-separated path to the token (e.g., "primary.blue")
    * @param mode - The desired mode (defaults to collection's default mode)
@@ -1044,7 +1043,8 @@ export class Collection {
   /**
    * Gets the mode used when a call omits one.
    *
-   * The first declared mode unless `setDefaultMode()` changed it. Callers that
+   * The first declared mode, or for a collection a resolver built, the combination of every modifier's declared
+   * default, wherever the build put it (`setModeContexts()` records it). Callers that
    * resolve a `'default'` sentinel must read this rather than `getModes()[0]`,
    * or the two disagree the moment the default is changed.
    *

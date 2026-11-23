@@ -48,12 +48,9 @@ export class DesignSystem {
    * designSystem.addCollection(spacing);
    * designSystem.addCollection(typography);
    *
-   * // Now tokens can reference across collections
-   * designSystem.setToken('colors', 'primary', { $value: '#007bff', $type: 'color' });
-   * designSystem.setToken('spacing', 'button.padding', {
-   *   $value: '12px',
-   *   $type: 'dimension'
-   * });
+   * // Tokens go into their collection; a reference stays inside its own collection
+   * colors.setToken('primary', new DesignToken('#007bff', 'color'));
+   * spacing.setToken('button.padding', new DesignToken({ value: 12, unit: 'px' }, 'dimension'));
    *
    * // Invalid input (throws error)
    * // designSystem.addCollection({}); // Error: not a Collection instance
@@ -152,7 +149,7 @@ export class DesignSystem {
    *   value, one own member or array index per segment:
    *   `type.body.fontSize`, `elevation.raised.0.color`, `color.blue.components.0`.
    *   This is the lookup-path form of the W3C JSON Pointer `$ref` (§7, Example 32).
-   *   A member is not a token: `resolveToken()` and `queryToken()` do not see it.
+   *   A member is not a token: `resolveToken()` does not see it.
    *
    * @param path - Full lookup path (format: "collectionName.tokenPath[.member...]")
    * @param mode - The mode to resolve in (defaults to 'default')
@@ -172,16 +169,17 @@ export class DesignSystem {
    * @example
    * ```typescript
    * const designSystem = new DesignSystem();
-   * designSystem.addCollection(new Collection('colors'));
+   * const colors = new Collection('colors');
+   * designSystem.addCollection(colors);
    *
-   * designSystem.setToken('colors', 'primary.blue', { $value: '#007bff', $type: 'color' });
+   * colors.setToken('primary.blue', new DesignToken('#007bff', 'color'));
    *
    * // References are document-relative — no 'colors.' prefix
-   * designSystem.setToken('colors', 'button.bg', { $value: '{primary.blue}', $type: 'color' });
-   * designSystem.setToken('colors', 'shadow', {
-   *   $value: { color: 'color-mix(in srgb, {primary.blue} 50%, transparent)', offsetX: '0px', offsetY: '2px', blur: '4px' },
-   *   $type: 'shadow'
-   * });
+   * colors.setToken('button.bg', new DesignToken('{primary.blue}', 'color'));
+   * colors.setToken('shadow', new DesignToken(
+   *   { color: 'color-mix(in srgb, {primary.blue} 50%, transparent)', offsetX: '0px', offsetY: '2px', blur: '4px' },
+   *   'shadow',
+   * ));
    *
    * // Lookups are collection-qualified
    * designSystem.resolveValue('colors.primary.blue');  // { colorSpace: 'srgb', …, hex: '#007bff' }
@@ -191,8 +189,8 @@ export class DesignSystem {
    * designSystem.resolveValue('colors.shadow.offsetY'); // { value: 2, unit: 'px' }
    *
    * // Circular references are reported, not passed through
-   * designSystem.setToken('colors', 'circular1', { $value: '{circular2}', $type: 'color' });
-   * designSystem.setToken('colors', 'circular2', { $value: '{circular1}', $type: 'color' });
+   * colors.setToken('circular1', new DesignToken('{circular2}', 'color'));
+   * colors.setToken('circular2', new DesignToken('{circular1}', 'color'));
    * // designSystem.resolveValue('colors.circular1'); // Throws CircularReferenceError
    * ```
    */

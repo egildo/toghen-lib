@@ -329,8 +329,8 @@ function dereference(reference: string, ctx: AliasContext): unknown {
  *
  * A Toghen extension: the W3C format only ever gives a `$value` that is
  * *entirely* one reference. Kept because it is genuinely useful for values with
- * no structured equivalent, and because `isReference()`/`getReferences()` have
- * always reported embedded references.
+ * no structured equivalent, and because `referencesOf()` has always reported
+ * embedded references.
  *
  * Built by concatenation rather than `String.replace()`, which matters three
  * ways: `$&`, `` $` ``, `$'` and `$1` in a resolved value stay literal; every

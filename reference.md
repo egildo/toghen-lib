@@ -162,7 +162,9 @@ it names a **group** (which is not a token), or when the token has no value in
 that mode.
 
 Throws `InvalidModeError` for a mode the collection does not declare, rather
-than returning another mode's value.
+than returning another mode's value. `mode` omitted is the collection's default mode; the string `'default'` is
+not a sentinel here, as it is for `DesignSystem`, but a mode name, which a collection built with modes such as
+`light` and `dark` does not declare.
 
 ```typescript
 const token = collection.getToken('primary.blue');
@@ -660,7 +662,7 @@ Returns the names of all registered collections.
 
 #### `resolveValue(path, mode?): any`
 
-Resolves a token value, expanding every reference it contains, including those nested inside composite values and arrays. `mode` defaults to the string `'default'`. Every method of `DesignSystem` that takes a mode reads that sentinel as "this collection's default mode" (`getDefaultMode()`), whatever that mode is called. A collection may declare a mode named `default` too, and the two then coincide. `resolveToken()`, `referencesOf()` and `getToken()` take the same sentinel.
+Resolves a token value, expanding every reference it contains, including those nested inside composite values and arrays. `mode` defaults to the string `'default'`. Every method of `DesignSystem` that takes a mode reads that sentinel as "this collection's default mode" (`getDefaultMode()`), whatever that mode is called. A collection may declare a mode named `default` too, and the two then coincide. `resolveToken()` and `referencesOf()` take the same sentinel. `Collection.getToken()` does not: omitted, its mode is the collection's default, and `'default'` is a mode name like any other, so a collection that declares no mode of that name throws `InvalidModeError` for it.
 
 Throws on a dangling, malformed, or circular reference rather than passing the
 `{...}` text through. See [Error Classes](#error-classes).

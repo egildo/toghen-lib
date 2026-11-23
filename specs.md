@@ -27,11 +27,11 @@ asks them, one command each.
 | **paths** | What lies under a group, each marked token or group; what a group declares; the lookup path of a reference path and back | `Collection.childrenOf`, `getAllPaths`, `getNodeKind`, `getGroupAttribute`, `DesignSystem.lookupPath`, `referencePath` |
 | **value** | A token's value, or a member's, in a mode; across the modes; what each context says and which definition applies; the value under contexts no build made | `DesignSystem.resolveValue`, `Resolver.contextsOf`, `Resolver.valueAt`, `normalizeTokenValue` and the normalized forms |
 | **type** | A token's type, its own, through a reference, or its group's, in a mode | `DesignSystem.resolveToken` |
-| **refs** | What a token or a raw value refers to, member by member; which modifiers a token depends on, directly and through references | `DesignSystem.referencesOf`, `referencesIn`, `holdsReference`, `referenceTarget`, `parseReferencePath`, `Resolver.dependsOn` |
+| **refs** | What a token or a raw value refers to, member by member, and a raw string's text with its escapes removed; which modifiers a token depends on, directly and through references | `DesignSystem.referencesOf`, `referencesIn`, `holdsReference`, `referenceTarget`, `parseReferencePath`, `literalText`, `Resolver.dependsOn` |
 | **parts** | The parts a path passes through, its component, its twins and rest; the part a group is; the vocabulary in force; a component's axes in precedence order | `Collection.partsOf`, `partAt`, `vocabularyAt`, `axesOf` |
 | **applies** | Under a selection of part values, which token supplies each key of a component | `Collection.applies` |
 | **check** | The holes, the non-factorable tokens, the tokens incomplete in some mode and the tokens with one CSS name, in one call; two sources of one set or context giving one token a value | `Collection.check`, `load` (its collisions) |
-| **css** | The names two adapters share: a token's custom property, a chain link's, a context's spelling | `cssPropertyName`, `cssIdentifier`, `cssLinkName`, `getContextSelector` |
+| **css** | The names two adapters share: a token's custom property, a chain link's, a context's spelling, the two contexts a `light-dark()` modifier pairs | `cssPropertyName`, `cssIdentifier`, `cssLinkName`, `getContextSelector`, `getLightDark` |
 
 A consumer that needs something else asks for it to be added here, once a second consumer asks it too; until then
 it is the consumer's own business. The rules each answer follows:
@@ -709,12 +709,11 @@ The rulings on the errors of `valueAt`, the open names and the document-wide che
 
 ## Token values
 
-**A token's value is checked however it enters.** Every path into a system (`DesignSystem.setToken()`, `Collection.setToken()`, a resolver document) ends in `Collection.setToken()`, and the check runs there.
+**A token's value is checked however it enters.** Every path into a system (`Collection.setToken()`, a resolver document, `load`) ends in `Collection.setToken()`, and the check runs there.
 
 **The W3C types are lib's, not the caller's.** `color`, `dimension`, `fontFamily`, `fontWeight`,
-`border`, `shadow`, `typography` and `gradient` are checked whether or not a handler is registered
-for them: their shape is a fact about the format, not a choice a system makes.
-A registered handler adds methods, and may add its own `validate()`.
+`border`, `shadow`, `typography` and `gradient` are checked by lib's own handlers, which a system cannot replace:
+their shape is a fact about the format, not a choice a system makes.
 
 **Lib stores the computed value.** CSS Values separates three values: the *specified* value, what the author
 wrote; the *computed* value, reduced as far as it can be without an element; and the *used* value, which needs the
@@ -830,7 +829,7 @@ A dimension token stays `px` or `rem`: a spacing in `em` has no meaning in Figma
 
 **A letter spacing is a token type of its own.** A design system may keep its tracking as a ramp (`track.tight`, `track.wide`) that is nothing but letter spacings. Untyped, the ramp is stored as written, checked by nothing, skipped by Figma, and a component token that references it is a type conflict. Typed `dimension`, it cannot hold `em`; and it cannot become typography tokens, which need a family and a size. So the lib has a type, `letterSpacing`, for a token that is only ever a letter spacing.
 
-- **The type is a Toghen extension, not a W3C one.** The format has no letter spacing type. Tokens Studio, a tool that reads the same format, has one of this name. Like the W3C types it is checked on load whether or not a handler is registered, since its shape is a fact about the type.
+- **The type is a Toghen extension, not a W3C one.** The format has no letter spacing type. Tokens Studio, a tool that reads the same format, has one of this name. Like the W3C types it is checked on load by lib's own handler, since its shape is a fact about the type.
 - **Its value** is a length: `{ value, unit }` with `unit` one of `px`, `rem` or `em`, or the string form (`'-0.021em'`), converted to the structured form as other strings are. `pt` and `mm` are refused: no one tracks text in them, and a smaller set is easier to state. A bare number is refused.
 - **Where it is used.** A typography token's `letterSpacing` member may reference a `letterSpacing` token, as it may reference a `dimension` token. A `letterSpacing` token is not a dimension and does not pass as one: a place that wants a dimension meets a type conflict, which is the point of the type. The lib adds no walk over references to check where a letter spacing ends up.
 - **The member keeps its rule.** The `em` in a typography `letterSpacing` member, written inline, stays as set out above. The member goes through the type's gate, so a member in `pt` or `mm` is refused too.

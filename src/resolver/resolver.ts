@@ -270,7 +270,7 @@ export class Resolver {
    * for every theme at once.
    *
    * That is what makes the mode argument downstream meaningful —
-   * `system.resolveValue(path, 'dark')`, `entries('dark')`, or
+   * `system.resolveValue(path, 'dark')`, `getAllPaths('dark')`, or
    * `toghen(path, dark)` in CSS. Against a system built from a single
    * permutation those would quietly return the one context it holds.
    *

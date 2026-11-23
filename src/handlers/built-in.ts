@@ -32,8 +32,8 @@ const builtIn: Record<string, TokenTypeHandler> = {
  * holding a reference is returned as written: it has no shape until it resolves.
  *
  * Every token goes through it on load. It is exported for an adapter that
- * holds a raw step value from `Resolver.step()`, written as the document
- * writes it, and needs it in the stored shape.
+ * holds a raw value, written as the document writes it, and needs it in the
+ * stored shape; a chain's steps from `Resolver.contextsOf()` come in it already.
  *
  * @param type - The token's `$type`; a type lib does not own is returned as is
  * @param value - The value as the document writes it

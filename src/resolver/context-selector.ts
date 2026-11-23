@@ -27,8 +27,8 @@ export interface ContextSelector {
 /**
  * The CSS spelling of `context`, or `undefined` when the modifier gives none.
  *
- * @param modifier - A modifier from a resolver document, or one a collection
- *   records (`collection.getModifiers()`)
+ * @param modifier - A modifier from a resolver document, or one `getModifiers()`
+ *   lists (`collection.resolver.getModifiers()`)
  * @throws {ResolverValidationError} When the extension's `selector` or `atRule` is not a string,
  *   or an `atRule` does not start with `@`
  */
