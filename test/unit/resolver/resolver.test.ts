@@ -1002,3 +1002,33 @@ describe('Resolver — modifier and context names match without regard to case, 
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// A name the Object prototype holds is an ordinary name in a document
+// ---------------------------------------------------------------------------
+
+describe('Resolver — __proto__, constructor and valueOf are ordinary names in a document', () => {
+  it('keeps them as groups and tokens, from a document parsed from JSON', () => {
+    const text = JSON.stringify({
+      version: '2025-11-01',
+      name: 'ds',
+      sets: {
+        s: {
+          sources: [
+            { '~proto~': { evil: { $type: 'dimension', $value: { value: 1, unit: 'px' } } } },
+            { constructor: { $type: 'color', $value: { colorSpace: 'srgb', components: [1, 1, 1] } } },
+            { valueOf: { a: { $type: 'color', $value: { colorSpace: 'srgb', components: [0, 0, 0] } } } },
+          ],
+        },
+      },
+      resolutionOrder: [{ $ref: '#/sets/s' }],
+    }).replace('~proto~', '__proto__');
+    const resolver = new Resolver(JSON.parse(text));
+
+    assert.deepEqual(Object.keys(resolver.resolve()), ['__proto__', 'constructor', 'valueOf']);
+    const collection = resolver.resolveToDesignSystem().getCollection('ds')!;
+    assert.deepEqual(collection.getAllPaths(), ['__proto__.evil', 'constructor', 'valueOf.a']);
+    assert.deepEqual(collection.getToken('__proto__.evil')!.$value, { value: 1, unit: 'px' });
+    assert.equal(({} as Record<string, unknown>).evil, undefined);
+  });
+});

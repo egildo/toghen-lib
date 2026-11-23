@@ -256,7 +256,9 @@ export class Collection {
     this.name = name;
     this.modes = [...modes];
     this.defaultMode = modes[0];
-    this.tokens = {}; // The root of the token hierarchy
+    // The root of the token hierarchy. Every group is an object with no prototype, so a name the Object
+    // prototype holds (`constructor`, `toString`, `__proto__`) is an ordinary key, never inherited.
+    this.tokens = Object.create(null);
   }
 
   /**
@@ -449,7 +451,7 @@ export class Collection {
       }
 
       if (!node) {
-        current[part] = {};
+        current[part] = Object.create(null);
       }
       current = current[part] as TokenGroup;
     }
@@ -657,7 +659,7 @@ export class Collection {
         );
       }
       if (!current[part]) {
-        current[part] = {};
+        current[part] = Object.create(null);
       }
       current = current[part] as TokenGroup;
     }
@@ -764,7 +766,9 @@ export class Collection {
         );
       }
       for (const [axis, values] of Object.entries(parts as Record<string, Record<string, string>>)) {
-        vocabulary[axis] = { ...vocabulary[axis], ...values };
+        // Defined, not assigned, so an axis named `__proto__` is an axis.
+        const merged = { ...(Object.keys(vocabulary).includes(axis) ? vocabulary[axis] : {}), ...values };
+        Object.defineProperty(vocabulary, axis, { value: merged, enumerable: true, writable: true, configurable: true });
       }
     }
     return vocabulary;
@@ -874,7 +878,7 @@ export class Collection {
       if (i === 0 || (i === segments.length - 1 && !lastIsPart)) return;
       const group = segments.slice(0, i).join('.');
       const vocabulary = this.vocabularyAt(group, mode);
-      const axes = Object.keys(vocabulary).filter((axis) => key in vocabulary[axis]);
+      const axes = Object.keys(vocabulary).filter((axis) => Object.keys(vocabulary[axis]).includes(key));
       if (axes.length === 0) return;
       if (axes.length > 1) {
         throw new InvalidTokenError(

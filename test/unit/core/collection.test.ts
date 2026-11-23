@@ -159,3 +159,39 @@ describe('Collection', () => {
     assert.deepStrictEqual(collection.getToken('font.sans')?.$value, stack);
   });
 });
+
+describe('Collection: a name the Object prototype holds is an ordinary name', () => {
+  const RED = { colorSpace: 'srgb', components: [1, 0, 0] };
+  const GAP = { value: 4, unit: 'px' };
+
+  it('stores and finds a token under constructor, toString and __proto__, and pollutes nothing', () => {
+    const collection = new Collection('test');
+    collection.setToken('constructor.gap', new DesignToken(GAP, 'dimension'));
+    collection.setToken('toString', new DesignToken(RED, 'color'));
+    collection.setToken('__proto__.polluted', new DesignToken(GAP, 'dimension'));
+
+    assert.deepStrictEqual(collection.getAllPaths(), ['constructor.gap', 'toString', '__proto__.polluted']);
+    assert.deepStrictEqual(collection.getToken('constructor.gap')?.$value, GAP);
+    assert.deepStrictEqual(collection.getToken('toString')?.$value, RED);
+    assert.deepStrictEqual(collection.getToken('__proto__.polluted')?.$value, GAP);
+    assert.strictEqual(collection.getNodeKind('valueOf'), 'missing');
+    assert.strictEqual(collection.getToken('hasOwnProperty'), null);
+    assert.strictEqual((Object as unknown as Record<string, unknown>).gap, undefined);
+    assert.strictEqual(({} as Record<string, unknown>).polluted, undefined);
+  });
+
+  it('reads a part key the Object prototype holds as no part, and a vocabulary value of that name as a part', () => {
+    const collection = new Collection('ui');
+    collection.setGroupAttribute('', '$extensions', {
+      'com.toghen': { css: { parts: { state: { hover: ':hover', toString: ':focus' } } } },
+    });
+    collection.setToken('button.constructor.color', new DesignToken(RED, 'color'));
+    collection.setToken('button.toString.color', new DesignToken(RED, 'color'));
+
+    assert.deepStrictEqual(collection.partsOf('button.constructor.color').parts, []);
+    assert.deepStrictEqual(
+      collection.partsOf('button.toString.color').parts.map((part) => [part.axis, part.key, part.spelling]),
+      [['state', 'toString', ':focus']],
+    );
+  });
+});

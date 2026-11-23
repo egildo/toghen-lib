@@ -87,7 +87,9 @@ function deepMergeTokenStructures(base: Record<string, any>, incoming: Record<st
   const result: Record<string, any> = { ...base };
 
   for (const [key, incomingVal] of Object.entries(incoming)) {
-    const baseVal = result[key];
+    // Own keys only, and defined rather than assigned, so `__proto__` and `constructor` are names like any other.
+    const baseVal = Object.prototype.hasOwnProperty.call(result, key) ? result[key] : undefined;
+    let merged: unknown;
 
     // Both sides are plain objects (i.e. token groups) → recurse
     if (
@@ -98,11 +100,12 @@ function deepMergeTokenStructures(base: Record<string, any>, incoming: Record<st
       typeof incomingVal === 'object' &&
       !Array.isArray(incomingVal)
     ) {
-      result[key] = deepMergeTokenStructures(baseVal as Record<string, any>, incomingVal as Record<string, any>);
+      merged = deepMergeTokenStructures(baseVal as Record<string, any>, incomingVal as Record<string, any>);
     } else {
       // Scalar, array, or leaf token — incoming wins
-      result[key] = incomingVal;
+      merged = incomingVal;
     }
+    Object.defineProperty(result, key, { value: merged, enumerable: true, writable: true, configurable: true });
   }
 
   return result;
