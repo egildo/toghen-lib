@@ -389,7 +389,7 @@ The Resolver handles multi-mode and multi-theme workflows. It reads a `.resolver
 | `modifiers` | — | Named conditional layers; each context key is a list of sources |
 | `$defs` | — | Silently ignored (pass-through, per spec MUST) |
 
-Items in `resolutionOrder` are either JSON Pointer `$ref`s (`#/sets/<name>`, `#/modifiers/<name>`) or inline `{ name, type, sources/contexts }` objects. `Resolver` follows same-document pointers only; file references are inlined first by `load`, below. Pointers follow RFC 6901 (`~1` → `/`, `~0` → `~`). Keys beside a `$ref` are overrides, as §4.2 requires, applied shallowly; a modifier's are applied wherever the modifier is read, so a `default` given beside its `$ref` is its default in mode names, `getModifiers()`, the builds and the chains as well as in `resolve()`.
+Items in `resolutionOrder` are either JSON Pointer `$ref`s (`#/sets/<name>`, `#/modifiers/<name>`) or inline `{ name, type, sources/contexts }` objects. `Resolver` follows same-document pointers only; file references are inlined first by `load`, below. Pointers follow RFC 6901 (`~1` → `/`, `~0` → `~`). A set whose sources refer back to it, directly or through other sets, is an `InvalidReferenceError` that gives the cycle, as `load` gives it: §4.2 forbids a circular reference object. Keys beside a `$ref` are overrides, as §4.2 requires, applied shallowly; a modifier's are applied wherever the modifier is read, so a `default` given beside its `$ref` is its default in mode names, `getModifiers()`, the builds and the chains as well as in `resolve()`.
 
 ### External sources: where the graph becomes one thing
 

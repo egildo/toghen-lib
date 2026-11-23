@@ -1371,7 +1371,7 @@ All are named exports supporting `instanceof` checks.
 | `CircularReferenceError` | Resolution engine | Token references create a cycle |
 | `ResolverValidationError` | `Resolver` constructor, `getContextSelector()`, `getLightDark()` | Wrong `version`, invalid modifier structure, a name occurring twice in `resolutionOrder` (inline or by `$ref`; sets and modifiers share the namespace); a modifier's CSS spelling that is not a string, or an `atRule` that does not start with `@`; a `lightDark` that is malformed, names a non-context, sits on a modifier without exactly two contexts, or sits beside another spelling |
 | `InvalidInputError` | `Resolver.resolve()`, `valueAt()` | Unknown modifier key, non-string value, missing required selection |
-| `InvalidReferenceError` | `Resolver.resolve()`, `load()`, `contextsOf()` | Unresolvable `$ref`, pointer to `#/resolutionOrder/…`, modifier referencing modifier; a file `load` cannot read or parse; a generated chain path that collides with a token |
+| `InvalidReferenceError` | `Resolver.resolve()`, `load()`, `contextsOf()` | Unresolvable `$ref`, pointer to `#/resolutionOrder/…`, modifier referencing modifier, a set whose sources refer back to it (the message gives the cycle); a file `load` cannot read or parse; a generated chain path that collides with a token |
 
 ---
 

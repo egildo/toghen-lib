@@ -846,8 +846,7 @@ export class Resolver {
 
     // Determine whether the target is a set or modifier by path
     if (pointer.startsWith('#/sets/')) {
-      const setName = pointer.slice('#/sets/'.length).split('/')[0];
-      return this.flattenSet(target as ResolverSet & { name?: string }, setName);
+      return this.flattenSet(target as ResolverSet & { name?: string }, [pointer]);
     }
 
     if (pointer.startsWith('#/modifiers/')) {
@@ -866,12 +865,15 @@ export class Resolver {
   /**
    * Merges all `sources` of a set in array order (last wins) into a single
    * token structure.
+   *
+   * @param via - The pointers of the sets being flattened, outermost first, so a set that refers back to one of
+   *   them is a cycle (Resolver §4.2: reference objects MUST NOT be circular)
    */
-  private flattenSet(set: ResolverSet & { name?: string }, _setName?: string): Record<string, any> {
+  private flattenSet(set: ResolverSet & { name?: string }, via: string[] = []): Record<string, any> {
     let result: Record<string, any> = {};
 
     for (const source of set.sources) {
-      const tokens = this.resolveTokenSource(source, 'set');
+      const tokens = this.resolveTokenSource(source, 'set', undefined, via);
       result = deepMergeTokenStructures(result, tokens);
     }
 
@@ -915,8 +917,14 @@ export class Resolver {
    * @param source - The token source to resolve.
    * @param sourceKind - `'set'` or `'modifier'` (for error messages).
    * @param modifierName - Name of the enclosing modifier (for error messages).
+   * @param via - The pointers of the sets being flattened, as {@link flattenSet} takes them.
    */
-  private resolveTokenSource(source: TokenSource, sourceKind: 'set' | 'modifier', modifierName?: string): Record<string, any> {
+  private resolveTokenSource(
+    source: TokenSource,
+    sourceKind: 'set' | 'modifier',
+    modifierName?: string,
+    via: string[] = [],
+  ): Record<string, any> {
     if (!isReferenceObject(source)) {
       // Inline DTCG token object — use as-is
       return source as Record<string, any>;
@@ -941,6 +949,10 @@ export class Resolver {
       throw new InvalidReferenceError(`$ref "${pointer}" in a token source must point to a named set (#/sets/<name>).`);
     }
 
+    if (via.includes(pointer)) {
+      throw new InvalidReferenceError(`$ref "${pointer}" closes a cycle: ${[...via, pointer].join(' → ')}.`);
+    }
+
     const docAny = this.doc as Record<string, any>;
     let target = resolveJsonPointer(docAny, pointer);
 
@@ -958,7 +970,7 @@ export class Resolver {
     }
 
     // Recursively flatten the referenced set
-    return this.flattenSet(target as ResolverSet);
+    return this.flattenSet(target as ResolverSet, [...via, pointer]);
   }
 
   // -------------------------------------------------------------------------

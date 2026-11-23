@@ -1092,3 +1092,36 @@ describe('Resolver — what it gives out shares nothing with the document', () =
     assert.deepEqual(system.resolveValue('ds.bg'), { colorSpace: 'srgb', components: [1, 1, 1] });
   });
 });
+
+// ---------------------------------------------------------------------------
+// A set whose sources refer back to it (Resolver §4.2: reference objects MUST NOT be circular)
+// ---------------------------------------------------------------------------
+
+describe('Resolver — a set whose sources refer back to it', () => {
+  const GAP = { $type: 'dimension', $value: { value: 4, unit: 'px' } };
+
+  it('throws InvalidReferenceError naming the cycle, for a set naming itself or one that names it back', () => {
+    const itself: ResolverDocument = {
+      version: '2025-11-01',
+      sets: { a: { sources: [{ gap: GAP }, { $ref: '#/sets/a' }] } },
+      resolutionOrder: [{ $ref: '#/sets/a' }],
+    };
+    const around: ResolverDocument = {
+      version: '2025-11-01',
+      sets: { a: { sources: [{ $ref: '#/sets/b' }] }, b: { sources: [{ gap: GAP }, { $ref: '#/sets/a' }] } },
+      resolutionOrder: [{ $ref: '#/sets/a' }],
+    };
+    assert.throws(() => new Resolver(itself).resolve(), { name: 'InvalidReferenceError', message: /#\/sets\/a → #\/sets\/a/ });
+    assert.throws(() => new Resolver(around).resolve(), { name: 'InvalidReferenceError', message: /#\/sets\/a → #\/sets\/b → #\/sets\/a/ });
+    assert.throws(() => new Resolver(around).contextsOf('gap'), InvalidReferenceError);
+  });
+
+  it('still reads a set that two sources name, which is no cycle', () => {
+    const resolver = new Resolver({
+      version: '2025-11-01',
+      sets: { base: { sources: [{ gap: GAP }] }, both: { sources: [{ $ref: '#/sets/base' }, { $ref: '#/sets/base' }] } },
+      resolutionOrder: [{ $ref: '#/sets/both' }],
+    });
+    assert.deepEqual(resolver.resolve().gap.$value, { value: 4, unit: 'px' });
+  });
+});
