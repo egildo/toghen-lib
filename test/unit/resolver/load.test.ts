@@ -317,8 +317,19 @@ describe('load refuses, naming the reference and the file', () => {
     await assert.rejects(load('r.json', files({ 'r.json': resolver({ $ref: 'https://example.test/p.json' }) })), /names a URI/);
   });
 
-  it('an entry document that cannot be read', async () => {
-    await assert.rejects(load('nowhere.json', files({})), /the entry document "nowhere\.json": "nowhere\.json" could not be read/);
+  it('an entry document that cannot be read, named once', async () => {
+    // The reason is the reader's own, which names the location again here.
+    await assert.rejects(
+      load('nowhere.json', files({})),
+      /^InvalidReferenceError: the entry document "nowhere\.json" could not be read\. ENOENT nowhere\.json$/,
+    );
+  });
+
+  it('an entry document that is not JSON, named once', async () => {
+    await assert.rejects(
+      load('r.json', files({ 'r.json': '{ nope' })),
+      /^InvalidReferenceError: the entry document "r\.json" is not JSON\. /,
+    );
   });
 });
 

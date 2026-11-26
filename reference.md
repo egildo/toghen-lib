@@ -1342,7 +1342,8 @@ const { collisions } = await load('ds.resolver.json', { read });
 **Errors.** `load` throws `InvalidReferenceError`, naming the reference and the file it was written in, when:
 
 - a reference has a URI scheme;
-- a file cannot be read or is not JSON;
+- a file cannot be read or is not JSON. The entry document has no reference, and is named once, by its location:
+  `the entry document "ds.resolver.json" could not be read. <the reader's reason>`;
 - a pointer names no group;
 - a reference names a whole resolver document, or a set or modifier it does not have;
 - two different modifiers share a name;
