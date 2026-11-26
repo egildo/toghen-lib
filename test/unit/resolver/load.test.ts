@@ -331,6 +331,24 @@ describe('load refuses, naming the reference and the file', () => {
       /^InvalidReferenceError: the entry document "r\.json" is not JSON\. /,
     );
   });
+
+  // The wrapper and its references are load's own: a file of the list is named as the entry is, by its location once,
+  // never as a $ref in a resolver document no one wrote.
+  const ink = { color: { ink: { $type: 'color', $value: { colorSpace: 'srgb', components: [0.1, 0.1, 0.1] } } } };
+
+  it('a token file of a list that cannot be read, named once', async () => {
+    await assert.rejects(
+      load(['ds/a.tokens.json', 'ds/gone.tokens.json'], files({ 'ds/a.tokens.json': ink })),
+      /^InvalidReferenceError: the entry's token file "ds\/gone\.tokens\.json" could not be read\. ENOENT ds\/gone\.tokens\.json$/,
+    );
+  });
+
+  it('a token file of a list that is not JSON, named once', async () => {
+    await assert.rejects(
+      load(['ds/a.tokens.json', 'ds/b.tokens.json'], files({ 'ds/a.tokens.json': ink, 'ds/b.tokens.json': '{ nope' })),
+      /^InvalidReferenceError: the entry's token file "ds\/b\.tokens\.json" is not JSON\. /,
+    );
+  });
 });
 
 // Token files with no resolver document: primitives, and roles that refer to them.

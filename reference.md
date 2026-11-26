@@ -1369,7 +1369,9 @@ const { collisions } = await load('ds.resolver.json', { read });
 
 - a reference has a URI scheme;
 - a file cannot be read or is not JSON. The entry document has no reference, and is named once, by its location:
-  `the entry document "ds.resolver.json" could not be read. <the reader's reason>`;
+  `the entry document "ds.resolver.json" could not be read. <the reader's reason>`. So is each of a list of token
+  files, whose wrapper and its references are `load`'s own: `the entry's token file "tokens/color.tokens.json" could
+  not be read. <the reader's reason>`. One the overrides map sent elsewhere is named by its reference, as below;
 - a pointer names no group;
 - a reference names a whole resolver document, or a set or modifier it does not have;
 - two different modifiers share a name;
