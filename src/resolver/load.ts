@@ -96,9 +96,10 @@ export interface Collision {
  *   resolver document, or a set or modifier that refers back to itself; and when
  *   an item of `resolutionOrder` names tokens rather than a set or modifier. The
  *   message names the reference, the file it was written in, and, when the map
- *   sent it elsewhere, the location read; the entry document, by its location
- *   once. Also when a list of token files is empty, or has no folder to take a
- *   name from and no `options.name`, and when a value of the map is not a string.
+ *   sent it elsewhere, the location read; the entry document, and each of a
+ *   list of token files, by its location once. Also when a list of token files
+ *   is empty, or has no folder to take a name from and no `options.name`, and
+ *   when a value of the map is not a string.
  */
 export async function load(given: string | string[], { read, name, overrides }: LoadOptions): Promise<LoadResult> {
   for (const [key, value] of Object.entries(overrides ?? {})) {
@@ -109,9 +110,9 @@ export async function load(given: string | string[], { read, name, overrides }: 
   const used = new Set<string>();
   const reads: LoadResult['reads'] = [];
   const files = new Map<string, Promise<unknown>>();
-  /** A file's parsed JSON, read once. `where`: the reference that names it; none for the entry. */
-  const file = (location: string, where?: string): Promise<unknown> => {
-    if (!files.has(location)) files.set(location, readJson(location, read, where));
+  /** A file's parsed JSON, read once. `what`: the file in a message, by the reference that names it; the entry by its location. */
+  const file = (location: string, what = `the entry document "${location}"`): Promise<unknown> => {
+    if (!files.has(location)) files.set(location, readJson(location, read, what));
     return files.get(location)!;
   };
 
@@ -123,6 +124,7 @@ export async function load(given: string | string[], { read, name, overrides }: 
     entry = wrapper.location;
     files.set(entry, Promise.resolve(wrapper.document));
   }
+  const wrapped = entry !== given;
 
   const root = (await file(entry)) as ResolverDocument;
   const document: ResolverDocument = { ...root, sets: {}, modifiers: {} };
@@ -148,7 +150,7 @@ export async function load(given: string | string[], { read, name, overrides }: 
       );
     }
 
-    const item = ((await file(location, where)) as Record<string, any>)[kind]?.[name];
+    const item = ((await file(location, `${where}: "${location}"`)) as Record<string, any>)[kind]?.[name];
     if (item === undefined) throw new InvalidReferenceError(`${where}: "${location}" has no ${kind.slice(0, -1)} "${name}".`);
 
     stack.push(key);
@@ -183,7 +185,9 @@ export async function load(given: string | string[], { read, name, overrides }: 
     const location = path === '' ? at : joinLocation(at, path);
     const where = mapped === undefined ? written : `${written} (mapped to "${location}")`;
     if (mapped !== undefined || !$ref.startsWith('#')) reads.push({ ref: $ref, holder: at, location, overridden: mapped !== undefined });
-    const target = await file(location, where);
+    // The wrapper's references are load's, not the person's: a file of the list is named as the entry is.
+    const own = wrapped && at === entry && mapped === undefined;
+    const target = await file(location, own ? `the entry's token file "${location}"` : `${where}: "${location}"`);
     const named = /^\/(sets|modifiers)\/([^/]+)$/.exec(fragment);
 
     if (isResolverDocument(target)) {
@@ -369,9 +373,7 @@ function isResolverDocument(value: unknown): boolean {
   return value !== null && typeof value === 'object' && Array.isArray((value as Record<string, unknown>).resolutionOrder);
 }
 
-async function readJson(location: string, read: LoadOptions['read'], where?: string): Promise<unknown> {
-  // The entry is its location; a reference is named, then the location it read.
-  const what = where === undefined ? `the entry document "${location}"` : `${where}: "${location}"`;
+async function readJson(location: string, read: LoadOptions['read'], what: string): Promise<unknown> {
   let text: string;
   try {
     text = await read(location);

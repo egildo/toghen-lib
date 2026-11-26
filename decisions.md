@@ -797,6 +797,21 @@ brace is text" (issue #129). Data files are JSON and component files KDL; both a
 - **The time `check()` takes**, on 1,000 synthetic tokens and three modifiers of three contexts, the median of seven runs: the product build of 27 modes went from 21 ms to 62 ms, the sum of 7 from 13 ms to 23 ms.
 - **Not listed: a non-scalar interpolated into a string.** It resolves, and it is the value that is refused (`InvalidInterpolationError`). `check()` neither lists it nor throws it, and a test pins that. W3C also asks for type mismatches to be reported. Whether `check()` should list them is an open question.
 
+## Fixed: a file of a list of token files named once (26 November 2026)
+
+**Status:** built, on the branch `token-file-list`; waits on the merge.
+
+**Where it comes from.** The measurement of 26 November 2026 (skills' `decisions.md`) left one double after figma 0.1.19: a list of token files with one missing. Egildo said "Fix the token-file list too" the same day. figma printed `tokens/color.tokens.json, tokens/nope.tokens.json: $ref "nope.tokens.json" in "/…/tokens/tokens.resolver.json": "/…/tokens/nope.tokens.json" could not be read. ENOENT: …`. The missing file is named three times, and the line cites `tokens.resolver.json`, the wrapper `load` holds in memory, which is on no disk. query's `--tokens` printed the same line after `error: `.
+
+**Fixed:**
+
+- **A file of a list that cannot be read, or is not JSON, is named as the entry is**, by its location once: `the entry's token file "<location>" could not be read. <reason>`. The wrapper and its references are `load`'s own, so the line no longer names them. It follows the entry's rule of 26 November. A listed file that the overrides map sent elsewhere keeps the reference's form: the person wrote that key.
+
+**What the build found.**
+
+- **Two rarer messages for a list still cite the wrapper:** a listed resolver document (`$ref "r.resolver.json" in "ds/ds.resolver.json" names a resolver document; point at one of its sets or modifiers.`), and a listed file that holds no group (`$ref "list.json" in "ds/ds.resolver.json" points to no group of tokens in "ds/list.json".`). Left as they are: they need words of their own, and nothing has met them.
+- **A mapped reference names its location twice**, list or not: `… (mapped to "ds/other.json"): "ds/other.json" could not be read.` Left as it is.
+
 ## Open questions
 
 ### From computing values (24 October 2026)
