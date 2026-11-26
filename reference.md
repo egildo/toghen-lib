@@ -547,16 +547,25 @@ hand. An adapter that needs the per-modifier questions
 #### `check(): Check`
 
 What is wrong with the collection's tokens, in one call: the tokens with no value in some mode, the tokens
-[`cssPropertyName`](#csspropertyname) gives one custom-property name, and, for a collection a resolver built, the
-holes of every chain and every non-factorable token. A token added by hand, which the resolver's document does not
-hold, is checked for its modes and its name only.
+[`cssPropertyName`](#csspropertyname) gives one custom-property name, the tokens that throw when resolved in a mode,
+and, for a collection a resolver built, the holes of every chain and every non-factorable token. A token added by
+hand, which the resolver's document does not hold, is checked for its modes, its name and its references only.
+
+`unresolvable` lists each token, once for each mode, that throws `UnresolvableReferenceError` or
+`CircularReferenceError` when it is resolved there: the reference that failed, exactly as written, braces included,
+and the error's `reason`, or `'circular'` for a cycle. A token that reaches the failure through another token's
+reference is listed too, with the reference that failed. In a cycle, each token on it is listed, with the reference
+that closes the cycle back to it: for `a` → `{b}` and `b` → `{a}`, `a` with `{a}` and `b` with `{b}`. A
+reference written in one context only is listed in the modes that context reaches. A non-scalar interpolated into a
+string is not listed: its reference resolves.
 
 ```typescript
 collection.check();
 // { incomplete: [{ path: 'card.glow', missingModes: ['low/light', 'high/light'] }],
 //   holes: [{ path: 'card.glow', property: '$value', holes: [{ theme: 'light' }] }, …],
 //   nonFactorable: [{ path: 'card.shadow', property: '$value', reason: 'partial-composite', … }],
-//   sameCssName: [{ name: '--space-a-b', paths: ['space.a.b', 'space.a-b'] }] }
+//   sameCssName: [{ name: '--space-a-b', paths: ['space.a.b', 'space.a-b'] }],
+//   unresolvable: [{ path: 'card.border', mode: 'low/dark', reference: '{color.missing}', reason: 'not-found' }, …] }
 ```
 
 ```typescript
@@ -565,6 +574,7 @@ interface Check {
   holes: Array<{ path: string; property: LeafProperty; holes: Array<Record<string, string>> }>;
   nonFactorable: NonFactorable[];
   sameCssName: Array<{ name: string; paths: string[] }>; // in document order, the paths of each name too
+  unresolvable: Array<{ path: string; mode: string; reference: string; reason: UnresolvableReferenceReason | 'circular' }>; // in document order, then mode order
 }
 ```
 
@@ -1389,7 +1399,7 @@ All are named exports supporting `instanceof` checks.
 | `InvalidInterpolationError` | Resolution engine | A non-scalar was interpolated into a string. Extends `InvalidTokenError`; carries `reference`, `tokenPath` |
 | `InvalidModeError` | Collection access | Specified mode doesn't exist |
 | `CollectionNotFoundError` | `DesignSystem` | A lookup path names no collection, and the system has more than one |
-| `CircularReferenceError` | Resolution engine | Token references create a cycle |
+| `CircularReferenceError` | Resolution engine | Token references create a cycle. From the engine, carries `reference`: the reference that closes the cycle, as written |
 | `ResolverValidationError` | `Resolver` constructor, `getContextSelector()`, `getLightDark()` | Wrong `version`, invalid modifier structure, a name occurring twice in `resolutionOrder` (inline or by `$ref`; sets and modifiers share the namespace); a modifier's CSS spelling that is not a string, or an `atRule` that does not start with `@`; a `lightDark` that is malformed, names a non-context, sits on a modifier without exactly two contexts, or sits beside another spelling |
 | `InvalidInputError` | `Resolver.resolve()`, `valueAt()` | Unknown modifier key, non-string value, missing required selection |
 | `InvalidReferenceError` | `Resolver.resolve()`, `load()`, `contextsOf()` | Unresolvable `$ref`, pointer to `#/resolutionOrder/…`, modifier referencing modifier, a set whose sources refer back to it (the message gives the cycle); a file `load` cannot read or parse; a generated chain path that collides with a token |

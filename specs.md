@@ -30,7 +30,7 @@ asks them, one command each.
 | **refs** | What a token or a raw value refers to, member by member, and a raw string's text with its escapes removed; which modifiers a token depends on, directly and through references | `DesignSystem.referencesOf`, `referencesIn`, `holdsReference`, `referenceTarget`, `parseReferencePath`, `literalText`, `Resolver.dependsOn` |
 | **parts** | The parts a path passes through, its component, its twins and rest; the part a group is; the vocabulary in force; a component's axes in precedence order | `Collection.partsOf`, `partAt`, `vocabularyAt`, `axesOf` |
 | **applies** | Under a selection of part values, which token supplies each key of a component | `Collection.applies` |
-| **check** | The holes, the non-factorable tokens, the tokens incomplete in some mode and the tokens with one CSS name, in one call; two sources of one set or context giving one token a value | `Collection.check`, `load` (its collisions) |
+| **check** | The holes, the non-factorable tokens, the tokens incomplete in some mode, the tokens with one CSS name and the tokens whose references do not resolve in some mode, in one call; two sources of one set or context giving one token a value | `Collection.check`, `load` (its collisions) |
 | **css** | The names two adapters share: a token's custom property, a chain link's, a context's spelling, the two contexts a `light-dark()` modifier pairs | `cssPropertyName`, `DesignSystem.cssPropertyNameOf`, `cssIdentifier`, `cssLinkName`, `getContextSelector`, `getLightDark` |
 
 A consumer that needs something else asks for it to be added here, once a second consumer asks it too; until then
@@ -122,7 +122,7 @@ A named container for tokens organized by dot-notation paths. Supports:
 - `vocabularyAt`, `partsOf`, `partAt`, `axesOf`, `applies`: the component model ([Worlds and parts](#worlds-and-parts))
 - `setModeContexts()` / `modeNamed()` / `resolver`: what a collection built from a resolver keeps of it (see the [reference](./reference.md#collection))
 - `getModes()` / `getDefaultMode()`
-- `check()`: the incomplete tokens, and for a collection a resolver built the holes and the non-factorable tokens
+- `check()`: the incomplete tokens, the tokens with one CSS name, the tokens that throw when resolved in a mode, and for a collection a resolver built the holes and the non-factorable tokens
 
 `getToken()` returns a token or `null`. A group path yields `null`. An undeclared mode throws `InvalidModeError` rather than falling back.
 
@@ -256,6 +256,12 @@ composite value (`at $value.color`), and the chain that led there.
 
 `resolveToken()` returns `null` only for a **lookup** miss. Resolution failures
 propagate, so a broken token is never mistaken for an absent one.
+
+The format also requires a tool to validate reference targets, and to resolve a
+value only when it is needed (§7). So nothing refuses a document for a broken
+reference, and a tool can still use the rest; `Collection.check()` resolves every
+token in every mode and lists each one that throws one of the two reference
+errors, in `unresolvable`, cycles included. Its cost grows with tokens times modes.
 
 ### Partial-string interpolation — a Toghen extension
 
@@ -1038,6 +1044,5 @@ Completed items are in [decisions.md](./decisions.md#completed).
   handler and are stored as written. No unit beyond the types' own is read: `in`, `cm`, `Q`, `pc` are refused.
 
 ### Future
-- [ ] Dangling references in the document-wide check, which lists holes, non-factorable tokens and incomplete tokens today
 - [ ] JSON Pointer `$ref` references (§7.1.2) and `$extends` (§6.4). Until then a `$ref` in a `$value` is stored as written and refused when it is read, with `UnresolvableReferenceError` and the reason `unsupported`.
 - [ ] Schema versioning / migration utilities

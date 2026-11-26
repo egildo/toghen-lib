@@ -67,9 +67,13 @@ export class CollectionNotFoundError extends Error {
  * ```
  */
 export class CircularReferenceError extends Error {
-  constructor(message: string) {
+  /** The reference that closes the cycle, exactly as written, braces included; set by the resolution engine. */
+  public readonly reference?: string;
+
+  constructor(message: string, reference?: string) {
     super(message);
     this.name = 'CircularReferenceError';
+    this.reference = reference;
   }
 }
 

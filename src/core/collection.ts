@@ -1,4 +1,14 @@
-import { DesignToken, InvalidTokenError, InvalidModeError, PathNotFoundError } from './design-token.js';
+import {
+  DesignToken,
+  CircularReferenceError,
+  InvalidInterpolationError,
+  InvalidTokenError,
+  InvalidModeError,
+  PathNotFoundError,
+  UnresolvableReferenceError,
+  type UnresolvableReferenceReason,
+} from './design-token.js';
+import { resolveTokenValue } from './alias.js';
 import type { LeafProperty, NonFactorable, TokenContexts } from '../resolver/chains.js';
 import { normalizeTokenValue } from '../handlers/built-in.js';
 import type { Resolver } from '../resolver/resolver.js';
@@ -78,6 +88,12 @@ export interface Check {
   nonFactorable: NonFactorable[];
   /** Tokens `cssPropertyName` gives one custom-property name (`a.b` and `a-b`), each name with its paths in document order. */
   sameCssName: Array<{ name: string; paths: string[] }>;
+  /**
+   * Tokens that throw when resolved in a mode, once for each mode: the reference that failed, as written, and why. A
+   * token that reaches it through another is listed too, with that reference. A cycle's reference is the one that
+   * closes it.
+   */
+  unresolvable: Array<{ path: string; mode: string; reference: string; reason: UnresolvableReferenceReason | 'circular' }>;
 }
 
 /**
@@ -920,11 +936,13 @@ export class Collection {
   }
 
   /**
-   * What is wrong with the collection's tokens, in one call: the tokens with no value in some mode and, for a
-   * collection built from a resolver document, the holes of every chain and every non-factorable token.
+   * What is wrong with the collection's tokens, in one call: the tokens with no value in some mode, the tokens with
+   * one custom-property name, the tokens that throw when resolved in a mode and, for a collection built from a
+   * resolver document, the holes of every chain and every non-factorable token.
    */
   public check(): Check {
     const incomplete: Check['incomplete'] = [];
+    const unresolvable: Check['unresolvable'] = [];
     const holes: Check['holes'] = [];
     const nonFactorable: NonFactorable[] = [];
     const byCssName = new Map<string, string[]>();
@@ -933,6 +951,22 @@ export class Collection {
       byCssName.set(name, [...(byCssName.get(name) ?? []), path]);
       const missingModes = this.modes.filter((mode) => !holdsValue(this.navigate(path), mode));
       if (missingModes.length > 0) incomplete.push({ path, missingModes });
+      for (const mode of this.modes) {
+        const token = this.getToken(path, mode);
+        if (!token) continue;
+        try {
+          resolveTokenValue(token, this, mode, path);
+        } catch (error) {
+          if (error instanceof UnresolvableReferenceError) {
+            unresolvable.push({ path, mode, reference: error.reference, reason: error.reason });
+          } else if (error instanceof CircularReferenceError) {
+            unresolvable.push({ path, mode, reference: error.reference ?? '', reason: 'circular' });
+          } else if (!(error instanceof InvalidInterpolationError)) {
+            // A non-scalar interpolated into a string resolves; it is the value that is refused.
+            throw error;
+          }
+        }
+      }
       if (!this.resolver) continue;
       let about: TokenContexts;
       try {
@@ -948,7 +982,7 @@ export class Collection {
       }
     }
     const sameCssName = [...byCssName].filter(([, paths]) => paths.length > 1).map(([name, paths]) => ({ name, paths }));
-    return { incomplete, holes, nonFactorable, sameCssName };
+    return { incomplete, holes, nonFactorable, sameCssName, unresolvable };
   }
 
   /**
