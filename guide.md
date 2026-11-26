@@ -246,6 +246,15 @@ The output is `not-found {surface.teal} broken`. A cycle reports the whole loop.
 Circular reference detected in collection "ds" (mode "default"): loop.a -> loop.b -> loop.a. Reference {loop.a} in token "ds.loop.b" at $value.
 ```
 
+To find every broken reference at once, ask the collection. `check()` resolves each token in each mode and lists those that throw, cycles included:
+
+```ts
+ds.check().unresolvable;
+// [{ path: 'broken', mode: 'default', reference: '{surface.teal}', reason: 'not-found' },
+//  { path: 'loop.a', mode: 'default', reference: '{loop.a}', reason: 'circular' },
+//  { path: 'loop.b', mode: 'default', reference: '{loop.b}', reason: 'circular' }]
+```
+
 ## Check a reference from outside a token document
 
 A component file can hold references too. The grammar is public, so its reader does not need its own pattern:
@@ -585,6 +594,13 @@ cssPropertyName('ds.button.backgroundColor'); // --button-background-color
 ```
 
 Two tokens that give the same name are a conflict; the CSS adapter reports it.
+
+`cssPropertyName()` checks nothing: it drops the first segment, whatever it is. With a system at hand, ask the system by the token's path. It takes the path without its collection when there is one, and throws for a path that names no token:
+
+```ts
+system.cssPropertyNameOf('surface.accent');    // --surface-accent
+system.cssPropertyNameOf('ds.surface.accent'); // --surface-accent
+```
 
 ## Normalize a colour to sRGB
 

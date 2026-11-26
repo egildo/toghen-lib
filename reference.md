@@ -547,16 +547,25 @@ hand. An adapter that needs the per-modifier questions
 #### `check(): Check`
 
 What is wrong with the collection's tokens, in one call: the tokens with no value in some mode, the tokens
-[`cssPropertyName`](#csspropertyname) gives one custom-property name, and, for a collection a resolver built, the
-holes of every chain and every non-factorable token. A token added by hand, which the resolver's document does not
-hold, is checked for its modes and its name only.
+[`cssPropertyName`](#csspropertyname) gives one custom-property name, the tokens that throw when resolved in a mode,
+and, for a collection a resolver built, the holes of every chain and every non-factorable token. A token added by
+hand, which the resolver's document does not hold, is checked for its modes, its name and its references only.
+
+`unresolvable` lists each token, once for each mode, that throws `UnresolvableReferenceError` or
+`CircularReferenceError` when it is resolved there: the reference that failed, exactly as written, braces included,
+and the error's `reason`, or `'circular'` for a cycle. A token that reaches the failure through another token's
+reference is listed too, with the reference that failed. In a cycle, each token on it is listed, with the reference
+that closes the cycle back to it: for `a` → `{b}` and `b` → `{a}`, `a` with `{a}` and `b` with `{b}`. A
+reference written in one context only is listed in the modes that context reaches. A non-scalar interpolated into a
+string is not listed: its reference resolves.
 
 ```typescript
 collection.check();
 // { incomplete: [{ path: 'card.glow', missingModes: ['low/light', 'high/light'] }],
 //   holes: [{ path: 'card.glow', property: '$value', holes: [{ theme: 'light' }] }, …],
 //   nonFactorable: [{ path: 'card.shadow', property: '$value', reason: 'partial-composite', … }],
-//   sameCssName: [{ name: '--space-a-b', paths: ['space.a.b', 'space.a-b'] }] }
+//   sameCssName: [{ name: '--space-a-b', paths: ['space.a.b', 'space.a-b'] }],
+//   unresolvable: [{ path: 'card.border', mode: 'low/dark', reference: '{color.missing}', reason: 'not-found' }, …] }
 ```
 
 ```typescript
@@ -565,6 +574,7 @@ interface Check {
   holes: Array<{ path: string; property: LeafProperty; holes: Array<Record<string, string>> }>;
   nonFactorable: NonFactorable[];
   sameCssName: Array<{ name: string; paths: string[] }>; // in document order, the paths of each name too
+  unresolvable: Array<{ path: string; mode: string; reference: string; reason: UnresolvableReferenceReason | 'circular' }>; // in document order, then mode order
 }
 ```
 
@@ -576,7 +586,7 @@ Two sources of one set or context giving one token a value are reported by
 ## DesignSystem
 
 The resolved system: its collections, and the answers about a token by its lookup path: its value, the token
-resolved, and the references it makes.
+resolved, the references it makes, and its custom property.
 
 ### Reference paths vs lookup paths
 
@@ -756,6 +766,22 @@ resolved type of the token it references, else the nearest parent group's
 
 ```typescript
 const token = system.resolveToken('colors.primary.blue');
+```
+
+### Custom property
+
+#### `cssPropertyNameOf(path): string`
+
+A token's CSS custom-property name by its path: what [`cssPropertyName`](#csspropertyname) gives its lookup path,
+with the [one-collection shorthand](#reference-paths-vs-lookup-paths). The path must name a token, in any mode: a
+token that one context alone defines has its name. A path that names nothing, a group, or a member past a token
+throws `PathNotFoundError`; a first segment that names no collection, in a system of two or more, throws
+`CollectionNotFoundError`.
+
+```typescript
+system.cssPropertyNameOf('button.backgroundColor');    // '--button-background-color'
+system.cssPropertyNameOf('ds.button.backgroundColor'); // '--button-background-color'
+system.cssPropertyNameOf('nope.nothing');              // throws: Token 'nope.nothing' not found in collection 'ds'.
 ```
 
 ---
@@ -1342,7 +1368,8 @@ const { collisions } = await load('ds.resolver.json', { read });
 **Errors.** `load` throws `InvalidReferenceError`, naming the reference and the file it was written in, when:
 
 - a reference has a URI scheme;
-- a file cannot be read or is not JSON;
+- a file cannot be read or is not JSON. The entry document has no reference, and is named once, by its location:
+  `the entry document "ds.resolver.json" could not be read. <the reader's reason>`;
 - a pointer names no group;
 - a reference names a whole resolver document, or a set or modifier it does not have;
 - two different modifiers share a name;
@@ -1367,12 +1394,12 @@ All are named exports supporting `instanceof` checks.
 | Class | Thrown by | Common causes |
 |---|---|---|
 | `InvalidTokenError` | `Collection.setToken`, `Collection.setGroupAttribute`, `Collection.getGroupAttribute`, the parts methods (`vocabularyAt()`, `partsOf()`, `partAt()`, `axesOf()`, `applies()`), `normalizeTokenValue()`, `DesignSystem.resolveValue()`, `resolveToken()`, `Resolver.valueAt()`, `contextsOf()` | A path segment that is empty or starts with `$`, a path that would make one node both a token and a group, or a group attribute set on a token's path; a group attribute name without `$`; a value its type rejects, on load or once it resolves; an invalid parts vocabulary, a key that is a value of two axes, or a path nesting two parts of one axis. The `DesignToken` constructor itself never throws |
-| `PathNotFoundError` | `DesignSystem.resolveValue()` | Lookup path doesn't exist |
+| `PathNotFoundError` | `DesignSystem.resolveValue()`, `cssPropertyNameOf()` | Lookup path doesn't exist |
 | `UnresolvableReferenceError` | Resolution engine | A `{reference}` inside a `$value` names no token, names a group, or is malformed; or a `$value` or a member of one is a JSON Pointer `{ "$ref": … }` (W3C §7.1.2), which is not supported yet. Extends `PathNotFoundError`; carries `reference` (a `$ref`'s pointer), `tokenPath`, `collectionName`, `mode`, `reason` (`'not-found' \| 'group' \| 'no-value' \| 'malformed' \| 'unsupported'`) |
 | `InvalidInterpolationError` | Resolution engine | A non-scalar was interpolated into a string. Extends `InvalidTokenError`; carries `reference`, `tokenPath` |
 | `InvalidModeError` | Collection access | Specified mode doesn't exist |
 | `CollectionNotFoundError` | `DesignSystem` | A lookup path names no collection, and the system has more than one |
-| `CircularReferenceError` | Resolution engine | Token references create a cycle |
+| `CircularReferenceError` | Resolution engine | Token references create a cycle. From the engine, carries `reference`: the reference that closes the cycle, as written |
 | `ResolverValidationError` | `Resolver` constructor, `getContextSelector()`, `getLightDark()` | Wrong `version`, invalid modifier structure, a name occurring twice in `resolutionOrder` (inline or by `$ref`; sets and modifiers share the namespace); a modifier's CSS spelling that is not a string, or an `atRule` that does not start with `@`; a `lightDark` that is malformed, names a non-context, sits on a modifier without exactly two contexts, or sits beside another spelling |
 | `InvalidInputError` | `Resolver.resolve()`, `valueAt()` | Unknown modifier key, non-string value, missing required selection |
 | `InvalidReferenceError` | `Resolver.resolve()`, `load()`, `contextsOf()` | Unresolvable `$ref`, pointer to `#/resolutionOrder/…`, modifier referencing modifier, a set whose sources refer back to it (the message gives the cycle); a file `load` cannot read or parse; a generated chain path that collides with a token |
@@ -1588,7 +1615,7 @@ cssPropertyName('ds.button.backgroundColor'); // '--button-background-color'
 cssPropertyName('ds.size.1/2');               // '--size-1\\/2'
 ```
 
-A token's CSS custom-property name, `--` included: the token path without the collection segment, each segment spelled by [`cssIdentifier`](#cssidentifier), joined by `-`. What an identifier cannot hold is escaped with a backslash, as `cssLinkName` escapes it: every character but a letter, a digit, `_`, `-` and a non-ASCII one. A name that is already an identifier is unchanged. Two paths may still give one name (`space.a.b` and `space.a-b`, `bgColor` and `bg-color`); [`check()`](#check-check) lists them in `sameCssName`. `@toghen/postcss` names properties with it by default, and the Figma adapter writes the same name as a variable's code syntax.
+A token's CSS custom-property name, `--` included: the token path without the collection segment, each segment spelled by [`cssIdentifier`](#cssidentifier), joined by `-`. What an identifier cannot hold is escaped with a backslash, as `cssLinkName` escapes it: every character but a letter, a digit, `_`, `-` and a non-ASCII one. A name that is already an identifier is unchanged. Two paths may still give one name (`space.a.b` and `space.a-b`, `bgColor` and `bg-color`); [`check()`](#check-check) lists them in `sameCssName`. `@toghen/postcss` names properties with it by default, and the Figma adapter writes the same name as a variable's code syntax. It is a pure function of the path and checks nothing: [`DesignSystem.cssPropertyNameOf`](#csspropertynameofpath-string) gives the name by a token's path, with the one-collection shorthand, and throws for a path that names no token.
 
 ### `cssLinkName`
 

@@ -776,6 +776,27 @@ brace is text" (issue #129). Data files are JSON and component files KDL; both a
 - `setGroupAttribute` keeps the caller's object.
 - `getNodeKind('tok.$value')` answers `'group'`.
 
+## Fixed and built: what the measurement of 25 November 2026 found (26 November 2026)
+
+**Status:** built; not released yet.
+
+**Where it comes from.** On 25 November 2026 the `toghen` skills were measured against the released tools (skills' `decisions.md`, *Measured*). The round's plan is house's `.reference/plans/workspace/plan-2026-11-25-measurement-fixes.md`. Egildo ruled its questions "1b 2a 3a 4a 5a" on 26 November 2026; this repository takes 4a and 5a.
+
+**Fixed:**
+
+- **The entry document is named once** when it cannot be read or is not JSON: `the entry document "<path>" could not be read. <reason>`. Before, its label and its location were the same path, printed twice. A `$ref`'s message is unchanged.
+
+**Ruled and built:**
+
+- **`DesignSystem.cssPropertyNameOf(path)`** (question 4a). A token's custom-property name by its path, with the one-collection shorthand that every other lookup takes. It throws `PathNotFoundError` for a path that names nothing, a group, a member past a token or the bare collection, and `CollectionNotFoundError` through `lookupPath`. `cssPropertyName` stays a pure function of a lookup path. A method also called `cssPropertyName` was not chosen: it would answer differently from the function of the same name, which is the trap the measurement found.
+- **`Check.unresolvable`** (question 5a). Each token that throws when resolved in a mode, once for each mode: its path, the mode, the reference as written, and the reason, or `'circular'` for a cycle. W3C §7 asks a tool to report both. A token that fails through another token's reference is listed too, with that reference. A token that refers to one only a single context defines is listed as `no-value` in the other modes. Hand-added tokens are checked as well. `CircularReferenceError` gained an optional `reference`, the one that closes the cycle. The specs' *Future* line on dangling references is done.
+
+**What the build found.**
+
+- One entry per mode, in document order then mode order. Grouping the modes, as `missingModes` does, was not chosen.
+- **The time `check()` takes**, on 1,000 synthetic tokens and three modifiers of three contexts, the median of seven runs: the product build of 27 modes went from 21 ms to 62 ms, the sum of 7 from 13 ms to 23 ms.
+- **Not listed: a non-scalar interpolated into a string.** It resolves, and it is the value that is refused (`InvalidInterpolationError`). `check()` neither lists it nor throws it, and a test pins that. W3C also asks for type mismatches to be reported. Whether `check()` should list them is an open question.
+
 ## Open questions
 
 ### From computing values (24 October 2026)

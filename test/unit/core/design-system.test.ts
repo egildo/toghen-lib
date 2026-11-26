@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DesignSystem, referencePath } from '../../../src/core/design-system.js';
 import { Collection } from '../../../src/core/collection.js';
-import { DesignToken, CollectionNotFoundError, InvalidTokenError } from '../../../src/core/design-token.js';
+import { DesignToken, CollectionNotFoundError, InvalidTokenError, PathNotFoundError } from '../../../src/core/design-token.js';
 import { Resolver } from '../../../src/resolver/resolver.js';
 
 const ink = { colorSpace: 'srgb', components: [0.1, 0.1, 0.1], hex: '#1a1a1a' };
@@ -64,6 +64,52 @@ describe('DesignSystem: lookup paths and reference paths', () => {
   it('gives the reference path of a lookup path', () => {
     assert.equal(referencePath('ds.button.backgroundColor'), 'button.backgroundColor');
     assert.equal(referencePath('ds'), '');
+  });
+});
+
+describe("DesignSystem.cssPropertyNameOf: a token's custom property by its path", () => {
+  it('takes the path with its collection or without it, when there is one', () => {
+    const ds = oneCollection();
+    assert.equal(ds.cssPropertyNameOf('button.color'), '--button-color');
+    assert.equal(ds.cssPropertyNameOf('ds.button.color'), '--button-color');
+    assert.equal(ds.cssPropertyNameOf('space.sm'), '--space-sm');
+  });
+
+  it('reads a first segment that names the collection as the collection', () => {
+    const ds = new DesignSystem();
+    const collection = new Collection('ds');
+    collection.setToken('ds.gap', new DesignToken(space, 'dimension'));
+    collection.setToken('gap', new DesignToken({ value: 2, unit: 'rem' }, 'dimension'));
+    ds.addCollection(collection);
+    assert.equal(ds.cssPropertyNameOf('ds.gap'), '--gap');
+    assert.equal(ds.cssPropertyNameOf('ds.ds.gap'), '--ds-gap');
+  });
+
+  it('wants the collection when there are two', () => {
+    const ds = oneCollection('a');
+    const b = new Collection('b');
+    b.setToken('space.sm', new DesignToken(space, 'dimension'));
+    ds.addCollection(b);
+    assert.equal(ds.cssPropertyNameOf('a.space.sm'), '--space-sm');
+    assert.equal(ds.cssPropertyNameOf('b.space.sm'), '--space-sm');
+    assert.throws(() => ds.cssPropertyNameOf('space.sm'), CollectionNotFoundError);
+  });
+
+  it('throws for a path that names no token: nothing, a group, a member past a token', () => {
+    const ds = oneCollection();
+    assert.throws(() => ds.cssPropertyNameOf('nope.nothing'), PathNotFoundError);
+    assert.throws(() => ds.cssPropertyNameOf('nope.nothing'), /^PathNotFoundError: Token 'nope\.nothing' not found in collection 'ds'\.$/);
+    assert.throws(() => ds.cssPropertyNameOf('color'), PathNotFoundError);
+    assert.throws(() => ds.cssPropertyNameOf('color.ink.components'), PathNotFoundError);
+    assert.throws(() => ds.cssPropertyNameOf('ds'), PathNotFoundError);
+  });
+
+  it('names a token one mode alone defines', () => {
+    const ds = new DesignSystem();
+    const collection = new Collection('ds', ['light', 'dark']);
+    collection.setToken('glow', new DesignToken(ink, 'color'), 'dark');
+    ds.addCollection(collection);
+    assert.equal(ds.cssPropertyNameOf('glow'), '--glow');
   });
 });
 

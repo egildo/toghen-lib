@@ -242,6 +242,109 @@ describe('the document-wide check', () => {
     const c = new Collection('c', ['light', 'dark']);
     c.setToken('bg', new DesignToken(srgb(1), 'color'), 'light');
     c.setToken('font', new DesignToken(['Inter'], 'fontFamily'));
-    assert.deepEqual(c.check(), { incomplete: [{ path: 'bg', missingModes: ['dark'] }], holes: [], nonFactorable: [], sameCssName: [] });
+    assert.deepEqual(c.check(), {
+      incomplete: [{ path: 'bg', missingModes: ['dark'] }],
+      holes: [],
+      nonFactorable: [],
+      sameCssName: [],
+      unresolvable: [],
+    });
+  });
+});
+
+describe('the document-wide check: references that do not resolve', () => {
+  /** Two modifiers, so a product build has four modes; `dark` adds what it is given. */
+  function themed(base: Record<string, unknown>, dark: Record<string, unknown> = {}): Collection {
+    const doc: ResolverDocument = {
+      version: '2025-11-01',
+      name: 'ui',
+      sets: { base: { sources: [base] } },
+      modifiers: {
+        theme: { default: 'light', contexts: { light: [], dark: [dark] } },
+        density: { default: 'cosy', contexts: { cosy: [], compact: [] } },
+      },
+      resolutionOrder: [{ $ref: '#/sets/base' }, { $ref: '#/modifiers/theme' }, { $ref: '#/modifiers/density' }],
+    } as ResolverDocument;
+    return new Resolver(doc).resolveAllToDesignSystem().getCollection('ui')!;
+  }
+
+  it('lists a colour whose $value refers to nothing, in every mode', () => {
+    const c = themed({ ink: color(0.1), accent: { $type: 'color', $value: '{nope}' } });
+    assert.deepEqual(
+      c.check().unresolvable,
+      c.getModes().map((mode) => ({ path: 'accent', mode, reference: '{nope}', reason: 'not-found' })),
+    );
+  });
+
+  it('lists a shadow whose color member refers to nothing', () => {
+    const c = themed({
+      shadow: { $type: 'shadow', $value: { color: '{color.missing}', offsetX: px(0), offsetY: px(2), blur: px(4), spread: px(0) } },
+    });
+    assert.deepEqual(
+      c.check().unresolvable.map(({ path, reference, reason }) => [path, reference, reason]),
+      c.getModes().map(() => ['shadow', '{color.missing}', 'not-found']),
+    );
+  });
+
+  it('lists a reference to nothing in the modes of the one context that writes it', () => {
+    const c = themed({ ink: color(0.1), accent: { $type: 'color', $value: '{ink}' } }, { accent: { $value: '{nope}' } });
+    const dark = c.getModes().filter((mode) => mode.startsWith('dark'));
+    assert.equal(dark.length, 2);
+    assert.deepEqual(
+      c.check().unresolvable,
+      dark.map((mode) => ({ path: 'accent', mode, reference: '{nope}', reason: 'not-found' })),
+    );
+  });
+
+  it('lists a token that reaches a reference to nothing through another, with that reference', () => {
+    const c = themed({ accent: { $type: 'color', $value: '{nope}' }, button: { $type: 'color', $value: '{accent}' } });
+    const [mode] = c.getModes();
+    assert.deepEqual(
+      c.check().unresolvable.filter((entry) => entry.mode === mode),
+      [
+        { path: 'accent', mode, reference: '{nope}', reason: 'not-found' },
+        { path: 'button', mode, reference: '{nope}', reason: 'not-found' },
+      ],
+    );
+  });
+
+  it('lists every token of a cycle, each with the reference that closes it', () => {
+    const c = themed({ a: { $type: 'color', $value: '{b}' }, b: { $type: 'color', $value: '{a}' }, ok: color(1) });
+    const [mode] = c.getModes();
+    assert.deepEqual(
+      c.check().unresolvable.filter((entry) => entry.mode === mode),
+      [
+        { path: 'a', mode, reference: '{a}', reason: 'circular' },
+        { path: 'b', mode, reference: '{b}', reason: 'circular' },
+      ],
+    );
+  });
+
+  it('leaves out a non-scalar interpolated into a string: the reference resolves, and the value is refused', () => {
+    const c = themed({ font: { $type: 'fontFamily', $value: ['Inter', 'system-ui'] }, label: { $value: 'set in {font}' } });
+    assert.deepEqual(c.check().unresolvable, []);
+  });
+
+  it('lists none in a document whose references all resolve', () => {
+    const c = themed(
+      {
+        ink: color(0.1),
+        gap: { $type: 'dimension', $value: px(4) },
+        font: { $type: 'fontFamily', $value: ['Inter', 'system-ui'] },
+        body: { $type: 'fontFamily', $value: '{font}' },
+        shadow: { $type: 'shadow', $value: { color: '{ink}', offsetX: px(0), offsetY: '{gap}', blur: px(4), spread: px(0) } },
+      },
+      { ink: color(0.9) },
+    );
+    assert.deepEqual(c.check().unresolvable, []);
+  });
+
+  it('lists a token added by hand that refers to nothing', () => {
+    const c = themed({ ink: color(0.1) });
+    c.setToken('hand', new DesignToken('{gone}', 'color'));
+    assert.deepEqual(
+      c.check().unresolvable.map(({ path, reason }) => [path, reason]),
+      c.getModes().map(() => ['hand', 'not-found']),
+    );
   });
 });

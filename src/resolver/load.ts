@@ -96,9 +96,9 @@ export interface Collision {
  *   resolver document, or a set or modifier that refers back to itself; and when
  *   an item of `resolutionOrder` names tokens rather than a set or modifier. The
  *   message names the reference, the file it was written in, and, when the map
- *   sent it elsewhere, the location read. Also when a list of token files is
- *   empty, or has no folder to take a name from and no `options.name`, and when
- *   a value of the map is not a string.
+ *   sent it elsewhere, the location read; the entry document, by its location
+ *   once. Also when a list of token files is empty, or has no folder to take a
+ *   name from and no `options.name`, and when a value of the map is not a string.
  */
 export async function load(given: string | string[], { read, name, overrides }: LoadOptions): Promise<LoadResult> {
   for (const [key, value] of Object.entries(overrides ?? {})) {
@@ -109,13 +109,14 @@ export async function load(given: string | string[], { read, name, overrides }: 
   const used = new Set<string>();
   const reads: LoadResult['reads'] = [];
   const files = new Map<string, Promise<unknown>>();
-  const file = (location: string, where: string): Promise<unknown> => {
+  /** A file's parsed JSON, read once. `where`: the reference that names it; none for the entry. */
+  const file = (location: string, where?: string): Promise<unknown> => {
     if (!files.has(location)) files.set(location, readJson(location, read, where));
     return files.get(location)!;
   };
 
   let entry: string;
-  if (typeof given === 'string' && isResolverDocument(await file(given, `the entry document "${given}"`))) {
+  if (typeof given === 'string' && isResolverDocument(await file(given))) {
     entry = given;
   } else {
     const wrapper = wrap(typeof given === 'string' ? [given] : given, name);
@@ -123,7 +124,7 @@ export async function load(given: string | string[], { read, name, overrides }: 
     files.set(entry, Promise.resolve(wrapper.document));
   }
 
-  const root = (await file(entry, `the entry document "${entry}"`)) as ResolverDocument;
+  const root = (await file(entry)) as ResolverDocument;
   const document: ResolverDocument = { ...root, sets: {}, modifiers: {} };
   const origins = new Map<string, string[]>();
   /** Each token source in `document` → the file it is written in, or was read from. */
@@ -368,17 +369,19 @@ function isResolverDocument(value: unknown): boolean {
   return value !== null && typeof value === 'object' && Array.isArray((value as Record<string, unknown>).resolutionOrder);
 }
 
-async function readJson(location: string, read: LoadOptions['read'], where: string): Promise<unknown> {
+async function readJson(location: string, read: LoadOptions['read'], where?: string): Promise<unknown> {
+  // The entry is its location; a reference is named, then the location it read.
+  const what = where === undefined ? `the entry document "${location}"` : `${where}: "${location}"`;
   let text: string;
   try {
     text = await read(location);
   } catch (error) {
-    throw new InvalidReferenceError(`${where}: "${location}" could not be read. ${(error as Error).message}`);
+    throw new InvalidReferenceError(`${what} could not be read. ${(error as Error).message}`);
   }
   try {
     return JSON.parse(text);
   } catch (error) {
-    throw new InvalidReferenceError(`${where}: "${location}" is not JSON. ${(error as Error).message}`);
+    throw new InvalidReferenceError(`${what} is not JSON. ${(error as Error).message}`);
   }
 }
 

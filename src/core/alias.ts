@@ -301,6 +301,7 @@ function dereference(reference: string, ctx: AliasContext): unknown {
         `(mode "${ctx.mode}"): ${[...ctx.chain, path].join(' -> ')}. ` +
         `Reference ${reference} in token "${ctx.collection.name}.${ctx.originPath}" ` +
         `at ${formatValuePath(ctx.valuePath)}.`,
+      reference,
     );
   }
 
