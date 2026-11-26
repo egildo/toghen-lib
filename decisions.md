@@ -799,7 +799,7 @@ brace is text" (issue #129). Data files are JSON and component files KDL; both a
 
 ## Fixed: a file of a list of token files named once (26 November 2026)
 
-**Status:** built, on the branch `token-file-list`; waits on the merge.
+**Status:** done, in 0.2.2.
 
 **Where it comes from.** The measurement of 26 November 2026 (skills' `decisions.md`) left one double after figma 0.1.19: a list of token files with one missing. Egildo said "Fix the token-file list too" the same day. figma printed `tokens/color.tokens.json, tokens/nope.tokens.json: $ref "nope.tokens.json" in "/…/tokens/tokens.resolver.json": "/…/tokens/nope.tokens.json" could not be read. ENOENT: …`. The missing file is named three times, and the line cites `tokens.resolver.json`, the wrapper `load` holds in memory, which is on no disk. query's `--tokens` printed the same line after `error: `.
 
