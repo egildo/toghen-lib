@@ -31,7 +31,7 @@ asks them, one command each.
 | **parts** | The parts a path passes through, its component, its twins and rest; the part a group is; the vocabulary in force; a component's axes in precedence order | `Collection.partsOf`, `partAt`, `vocabularyAt`, `axesOf` |
 | **applies** | Under a selection of part values, which token supplies each key of a component | `Collection.applies` |
 | **check** | The holes, the non-factorable tokens, the tokens incomplete in some mode and the tokens with one CSS name, in one call; two sources of one set or context giving one token a value | `Collection.check`, `load` (its collisions) |
-| **css** | The names two adapters share: a token's custom property, a chain link's, a context's spelling, the two contexts a `light-dark()` modifier pairs | `cssPropertyName`, `cssIdentifier`, `cssLinkName`, `getContextSelector`, `getLightDark` |
+| **css** | The names two adapters share: a token's custom property, a chain link's, a context's spelling, the two contexts a `light-dark()` modifier pairs | `cssPropertyName`, `DesignSystem.cssPropertyNameOf`, `cssIdentifier`, `cssLinkName`, `getContextSelector`, `getLightDark` |
 
 A consumer that needs something else asks for it to be added here, once a second consumer asks it too; until then
 it is the consumer's own business. The rules each answer follows:
@@ -138,6 +138,7 @@ lookup path.
 - `resolveValue(path, mode?)`: resolves a token value, expanding all references; the path may continue into the resolved value
 - `resolveToken(path, mode?)`: returns a resolved `DesignToken` instance
 - `referencesOf(path, mode?)`: the references a token's value makes, as written (first hop, per member)
+- `cssPropertyNameOf(path)`: a token's custom property, with the one-collection shorthand; a path that names no token throws
 
 ---
 

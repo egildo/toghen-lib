@@ -576,7 +576,7 @@ Two sources of one set or context giving one token a value are reported by
 ## DesignSystem
 
 The resolved system: its collections, and the answers about a token by its lookup path: its value, the token
-resolved, and the references it makes.
+resolved, the references it makes, and its custom property.
 
 ### Reference paths vs lookup paths
 
@@ -756,6 +756,22 @@ resolved type of the token it references, else the nearest parent group's
 
 ```typescript
 const token = system.resolveToken('colors.primary.blue');
+```
+
+### Custom property
+
+#### `cssPropertyNameOf(path): string`
+
+A token's CSS custom-property name by its path: what [`cssPropertyName`](#csspropertyname) gives its lookup path,
+with the [one-collection shorthand](#reference-paths-vs-lookup-paths). The path must name a token, in any mode: a
+token that one context alone defines has its name. A path that names nothing, a group, or a member past a token
+throws `PathNotFoundError`; a first segment that names no collection, in a system of two or more, throws
+`CollectionNotFoundError`.
+
+```typescript
+system.cssPropertyNameOf('button.backgroundColor');    // '--button-background-color'
+system.cssPropertyNameOf('ds.button.backgroundColor'); // '--button-background-color'
+system.cssPropertyNameOf('nope.nothing');              // throws: Token 'nope.nothing' not found in collection 'ds'.
 ```
 
 ---
@@ -1368,7 +1384,7 @@ All are named exports supporting `instanceof` checks.
 | Class | Thrown by | Common causes |
 |---|---|---|
 | `InvalidTokenError` | `Collection.setToken`, `Collection.setGroupAttribute`, `Collection.getGroupAttribute`, the parts methods (`vocabularyAt()`, `partsOf()`, `partAt()`, `axesOf()`, `applies()`), `normalizeTokenValue()`, `DesignSystem.resolveValue()`, `resolveToken()`, `Resolver.valueAt()`, `contextsOf()` | A path segment that is empty or starts with `$`, a path that would make one node both a token and a group, or a group attribute set on a token's path; a group attribute name without `$`; a value its type rejects, on load or once it resolves; an invalid parts vocabulary, a key that is a value of two axes, or a path nesting two parts of one axis. The `DesignToken` constructor itself never throws |
-| `PathNotFoundError` | `DesignSystem.resolveValue()` | Lookup path doesn't exist |
+| `PathNotFoundError` | `DesignSystem.resolveValue()`, `cssPropertyNameOf()` | Lookup path doesn't exist |
 | `UnresolvableReferenceError` | Resolution engine | A `{reference}` inside a `$value` names no token, names a group, or is malformed; or a `$value` or a member of one is a JSON Pointer `{ "$ref": … }` (W3C §7.1.2), which is not supported yet. Extends `PathNotFoundError`; carries `reference` (a `$ref`'s pointer), `tokenPath`, `collectionName`, `mode`, `reason` (`'not-found' \| 'group' \| 'no-value' \| 'malformed' \| 'unsupported'`) |
 | `InvalidInterpolationError` | Resolution engine | A non-scalar was interpolated into a string. Extends `InvalidTokenError`; carries `reference`, `tokenPath` |
 | `InvalidModeError` | Collection access | Specified mode doesn't exist |
@@ -1589,7 +1605,7 @@ cssPropertyName('ds.button.backgroundColor'); // '--button-background-color'
 cssPropertyName('ds.size.1/2');               // '--size-1\\/2'
 ```
 
-A token's CSS custom-property name, `--` included: the token path without the collection segment, each segment spelled by [`cssIdentifier`](#cssidentifier), joined by `-`. What an identifier cannot hold is escaped with a backslash, as `cssLinkName` escapes it: every character but a letter, a digit, `_`, `-` and a non-ASCII one. A name that is already an identifier is unchanged. Two paths may still give one name (`space.a.b` and `space.a-b`, `bgColor` and `bg-color`); [`check()`](#check-check) lists them in `sameCssName`. `@toghen/postcss` names properties with it by default, and the Figma adapter writes the same name as a variable's code syntax.
+A token's CSS custom-property name, `--` included: the token path without the collection segment, each segment spelled by [`cssIdentifier`](#cssidentifier), joined by `-`. What an identifier cannot hold is escaped with a backslash, as `cssLinkName` escapes it: every character but a letter, a digit, `_`, `-` and a non-ASCII one. A name that is already an identifier is unchanged. Two paths may still give one name (`space.a.b` and `space.a-b`, `bgColor` and `bg-color`); [`check()`](#check-check) lists them in `sameCssName`. `@toghen/postcss` names properties with it by default, and the Figma adapter writes the same name as a variable's code syntax. It is a pure function of the path and checks nothing: [`DesignSystem.cssPropertyNameOf`](#csspropertynameofpath-string) gives the name by a token's path, with the one-collection shorthand, and throws for a path that names no token.
 
 ### `cssLinkName`
 

@@ -586,6 +586,13 @@ cssPropertyName('ds.button.backgroundColor'); // --button-background-color
 
 Two tokens that give the same name are a conflict; the CSS adapter reports it.
 
+`cssPropertyName()` checks nothing: it drops the first segment, whatever it is. With a system at hand, ask the system by the token's path. It takes the path without its collection when there is one, and throws for a path that names no token:
+
+```ts
+system.cssPropertyNameOf('surface.accent');    // --surface-accent
+system.cssPropertyNameOf('ds.surface.accent'); // --surface-accent
+```
+
 ## Normalize a colour to sRGB
 
 `normalizeColorToSRGB01()` turns a colour string into sRGB numbers from zero to one, for renderers and for Figma:

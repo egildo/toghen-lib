@@ -3,6 +3,7 @@ import { DesignToken, CollectionNotFoundError, InvalidTokenError, PathNotFoundEr
 import { referencesIn, resolveTokenValue, resolveTypeThroughAlias, type TokenReference } from './alias.js';
 import { holdsReference } from './alias-syntax.js';
 import { computeTokenValue } from '../handlers/built-in.js';
+import { cssPropertyName } from '../utils/css-name.js';
 
 /**
  * The resolved system: its collections, and the answers about a token by its lookup path
@@ -252,6 +253,28 @@ export class DesignSystem {
       throw tokenNotFound(collection, tokenPath, resolveMode);
     }
     return referencesIn(token.$value, collection.name);
+  }
+
+  /**
+   * A token's CSS custom-property name, by its path: what `cssPropertyName` gives its lookup path. The path takes the
+   * one-collection shorthand, as `lookupPath` reads it. A token that one mode alone defines has its name too.
+   *
+   * @param path - A lookup path; in a system of one collection, a reference path too
+   * @returns The property name, `--` included
+   * @throws {PathNotFoundError} When the path names no token: nothing, a group, or a member past a token
+   * @throws {CollectionNotFoundError} When the first segment names no collection and the system has more than one
+   * @example
+   * ```typescript
+   * system.cssPropertyNameOf('button.backgroundColor');    // '--button-background-color'
+   * system.cssPropertyNameOf('ds.button.backgroundColor'); // '--button-background-color'
+   * ```
+   */
+  public cssPropertyNameOf(path: string): string {
+    const { collection, tokenPath } = this.locate(path, 'default');
+    if (collection.getNodeKind(tokenPath) !== 'token') {
+      throw new PathNotFoundError(`Token '${tokenPath}' not found in collection '${collection.name}'.`);
+    }
+    return cssPropertyName(`${collection.name}.${tokenPath}`);
   }
 
   /**
