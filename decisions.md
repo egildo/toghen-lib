@@ -778,7 +778,7 @@ brace is text" (issue #129). Data files are JSON and component files KDL; both a
 
 ## Fixed and built: what the measurement of 25 November 2026 found (26 November 2026)
 
-**Status:** built; not released yet.
+**Status:** done, in 0.2.1.
 
 **Where it comes from.** On 25 November 2026 the `toghen` skills were measured against the released tools (skills' `decisions.md`, *Measured*). The round's plan is house's `.reference/plans/workspace/plan-2026-11-25-measurement-fixes.md`. Egildo ruled its questions "1b 2a 3a 4a 5a" on 26 November 2026; this repository takes 4a and 5a.
 
